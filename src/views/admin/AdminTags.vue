@@ -45,7 +45,6 @@
             placeholder="请输入标签名"
             maxlength="20"
             show-word-limit
-            @keyup.enter="handleSubmit"
           />
         </el-form-item>
       </el-form>
@@ -106,6 +105,7 @@ function resetDialog() {
 }
 
 async function handleSubmit() {
+  if (saving.value) return;
   const trimmed = form.value.name.trim();
   if (!trimmed) {
     ElMessage.warning("请输入标签名");

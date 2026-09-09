@@ -41,7 +41,6 @@
             placeholder="请输入分类名"
             maxlength="20"
             show-word-limit
-            @keyup.enter="handleSubmit"
           />
         </el-form-item>
         <el-form-item label="描述">
@@ -58,7 +57,6 @@
           <el-input
             v-model="form.icon"
             placeholder="请输入图标URL（可选）"
-            @keyup.enter="handleSubmit"
           />
         </el-form-item>
       </el-form>
@@ -125,6 +123,7 @@ function resetDialog() {
 }
 
 async function handleSubmit() {
+  if (saving.value) return
   const trimmedName = form.value.name.trim()
   if (!trimmedName) {
     ElMessage.warning('请输入分类名')
