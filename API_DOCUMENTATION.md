@@ -566,9 +566,16 @@ Authorization: Bearer {accessToken}
 **请求**
 
 ```
-GET /posts/pending
+GET /posts/pending?page=1&pageSize=10
 Authorization: Bearer {accessToken}
 ```
+
+**Query 参数**
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|-----|------|:----:|-------|------|
+| page | number | 否 | 1 | 页码，从 1 开始 |
+| pageSize | number | 否 | 10 | 每页条数 |
 
 **返回**
 
@@ -576,24 +583,30 @@ Authorization: Bearer {accessToken}
 {
   "code": 0,
   "message": "success",
-  "data": [
-    {
-      "id": 52,
-      "title": "待审核文章标题",
-      "userId": 1,
-      "authorNickname": "zhangsan",
-      "status": 2,
-      "createdAt": "2024-01-20T14:30:00Z",
-      "tags": [{ "id": 1, "name": "Vue", "createdAt": "2024-01-01T00:00:00Z" }]
-    }
-  ]
+  "data": {
+    "data": [
+      {
+        "id": 52,
+        "title": "待审核文章标题",
+        "userId": 1,
+        "authorNickname": "zhangsan",
+        "status": 2,
+        "createdAt": "2024-01-20T14:30:00Z",
+        "tags": [{ "id": 1, "name": "Vue", "createdAt": "2024-01-01T00:00:00Z" }]
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "pageSize": 10,
+    "totalPages": 1
+  }
 }
 ```
 
 **备注**
 
 - 需要认证（登录）
-- 返回所有 `status=2` 的文章
+- 分页返回所有 `status=2` 的文章，`data` 为 `PaginatedResponse<ArticleListItem>`
 
 #### 6.2 审核通过（发布）
 
@@ -1056,9 +1069,21 @@ Content-Type: application/json
 
 ```
 GET /categories
+GET /categories?page=1&pageSize=10
 ```
 
+**Query 参数**
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|-----|------|:----:|-------|------|
+| page | number | 否 | - | 页码，从 1 开始。传入后启用分页 |
+| pageSize | number | 否 | - | 每页条数，启用分页时生效 |
+
 **返回**
+
+响应形态由是否传入分页参数决定：
+
+- **不传 `page`/`pageSize`**：返回全量数组（分类下拉选择器使用，向后兼容）。
 
 ```json
 {
@@ -1083,6 +1108,41 @@ GET /categories
 }
 ```
 
+- **传入 `page`/`pageSize`**：返回 `PaginatedResponse<Category>`（管理后台分类表格使用）。
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "data": [
+      {
+        "id": 1,
+        "name": "技术",
+        "description": "技术相关文章",
+        "articleCount": 15,
+        "createdAt": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 2,
+        "name": "生活",
+        "description": "生活感悟分享",
+        "articleCount": 8,
+        "createdAt": "2024-01-02T00:00:00Z"
+      }
+    ],
+    "total": 2,
+    "page": 1,
+    "pageSize": 10,
+    "totalPages": 1
+  }
+}
+```
+
+**备注**
+
+- 该接口同时服务于「分类下拉选择器」（需全量数组）与「后台分类表格」（需分页），通过是否传分页参数区分响应形态。
+
 ---
 
 ### 3. 获取单个分类
@@ -1090,7 +1150,7 @@ GET /categories
 **请求**
 
 ```
-GET /tags/{id}
+GET /categories/{id}
 ```
 
 **URL 参数**
@@ -1125,7 +1185,7 @@ GET /tags/{id}
 **请求**
 
 ```
-PUT /tags/{id}
+PUT /categories/{id}
 Authorization: Bearer {accessToken}
 Content-Type: application/json
 ```
@@ -1175,7 +1235,7 @@ Content-Type: application/json
 **请求**
 
 ```
-DELETE /tags/{id}
+DELETE /categories/{id}
 Authorization: Bearer {accessToken}
 ```
 
@@ -1255,14 +1315,22 @@ Content-Type: application/json
 
 ```
 GET /tags
+GET /tags?page=1&pageSize=10&keyword=Vue
 ```
 
 **Query 参数**
-| 参数 | 类型 | 必需 | 说明 |
-|-----|------|------|------|
-| keyword | string | 否 | 标签名搜索关键词 |
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|-----|------|:----:|-------|------|
+| keyword | string | 否 | - | 标签名搜索关键词（模糊匹配，仅在分页形态下生效） |
+| page | number | 否 | - | 页码，从 1 开始。传入后启用分页 |
+| pageSize | number | 否 | - | 每页条数，启用分页时生效 |
 
 **返回**
+
+响应形态由是否传入分页参数决定：
+
+- **不传 `page`/`pageSize`**：返回全量数组（标签下拉选择器使用，向后兼容）。
 
 ```json
 {
@@ -1283,9 +1351,37 @@ GET /tags
 }
 ```
 
+- **传入 `page`/`pageSize`**：返回 `PaginatedResponse<Tag>`（管理后台标签表格使用，支持 `keyword` 过滤）。
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "data": [
+      {
+        "id": 1,
+        "name": "Vue",
+        "createdAt": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 2,
+        "name": "TypeScript",
+        "createdAt": "2024-01-02T00:00:00Z"
+      }
+    ],
+    "total": 2,
+    "page": 1,
+    "pageSize": 10,
+    "totalPages": 1
+  }
+}
+```
+
 **备注**
 
 - 不需要认证
+- 该接口同时服务于「标签下拉选择器」（需全量数组）与「后台标签表格」（需分页 + 搜索），通过是否传分页参数区分响应形态
 
 ---
 

@@ -161,6 +161,12 @@ export interface CommentQueryParams {
 
 // ============ 分页 ============
 
+/** 通用分页请求参数 */
+export interface PageQuery {
+  page?: number
+  pageSize?: number
+}
+
 /** 分页响应 */
 export interface PaginatedResponse<T> {
   data: T[]

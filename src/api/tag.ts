@@ -1,7 +1,7 @@
 import client from './client'
-import type { Tag } from '@/types'
+import type { Tag, PageQuery, PaginatedResponse } from '@/types'
 
-export type { Tag }
+export type { Tag, PageQuery, PaginatedResponse }
 
 /** 标签请求体 */
 export interface TagPayload {
@@ -19,9 +19,24 @@ export const createTag = async (payload: TagPayload): Promise<Tag> => {
 /**
  * 获取所有标签
  * GET /tags
+ *
+ * 返回全量数组，供选择器（标签下拉）使用。管理表格分页请用 getTagsPaged。
  */
 export const getTags = async (): Promise<Tag[]> => {
   return client.get('/tags')
+}
+
+/**
+ * 分页获取标签（支持 keyword 模糊搜索）
+ * GET /tags?page=&pageSize=&keyword=
+ *
+ * 与 getTags 命中同一 endpoint：传 page/pageSize 时后端返回
+ * PaginatedResponse<Tag>，管理表格使用。
+ */
+export const getTagsPaged = async (
+  params: PageQuery & { keyword?: string }
+): Promise<PaginatedResponse<Tag>> => {
+  return client.get('/tags', { params })
 }
 
 /**

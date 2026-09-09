@@ -1,8 +1,8 @@
 import client from './client'
-import type { Category } from '@/types'
+import type { Category, PageQuery, PaginatedResponse } from '@/types'
 import { FIXED_CATEGORIES } from '@/constants/categories'
 
-export type { Category }
+export type { Category, PageQuery, PaginatedResponse }
 
 /**
  * 数据源切换开关（为后端传输数据预留的接口）：
@@ -39,6 +39,8 @@ export const createCategory = async (payload: CategoryPayload): Promise<Category
  * GET /categories
  *
  * 数据源：mock / 真实后端 / 固定数据兜底（见上方开关说明）。
+ *
+ * 返回全量数组，供选择器（分类下拉）使用。管理表格分页请用 getCategoriesPaged。
  */
 export const getCategories = async (): Promise<Category[]> => {
   // 开启 mock 或后端时走统一 client 请求
@@ -47,6 +49,19 @@ export const getCategories = async (): Promise<Category[]> => {
   }
   // 后端与 mock 均未开启：返回固定分类数据兜底
   return FIXED_CATEGORIES
+}
+
+/**
+ * 分页获取分类
+ * GET /categories?page=&pageSize=
+ *
+ * 与 getCategories 命中同一 endpoint：传 page/pageSize 时后端返回
+ * PaginatedResponse<Category>，管理表格使用。
+ */
+export const getCategoriesPaged = async (
+  params: PageQuery
+): Promise<PaginatedResponse<Category>> => {
+  return client.get('/categories', { params })
 }
 
 /**

@@ -310,7 +310,18 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
   },
 
   // ---- 分类 ----
-  [R('GET', /^\/categories$/)]: () => ok(mockCategories),
+  [R('GET', /^\/categories$/)]: (_, __, params) => {
+    // 不传分页参数：返回全量数组（选择器用，向后兼容）
+    if (params?.page === undefined) return ok(mockCategories)
+    // 传分页参数：返回 PaginatedResponse（管理表格用）
+    const page = Number(params.page) || 1
+    const ps = Number(params.pageSize) || 10
+    const total = mockCategories.length
+    return ok({
+      data: mockCategories.slice((page - 1) * ps, page * ps),
+      total, page, pageSize: ps, totalPages: Math.ceil(total / ps),
+    } as PaginatedResponse<Category>)
+  },
 
   // 创建分类
   [R('POST', /^\/categories$/)]: (_, data) => {
@@ -363,7 +374,23 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
   },
 
   // ---- 标签 ----
-  [R('GET', /^\/tags$/)]: () => ok(mockTags),
+  [R('GET', /^\/tags$/)]: (_, __, params) => {
+    // 不传分页参数：返回全量数组（选择器用，向后兼容）
+    if (params?.page === undefined) return ok(mockTags)
+    // 传分页参数：返回 PaginatedResponse（管理表格用），支持 keyword 模糊搜索
+    const page = Number(params.page) || 1
+    const ps = Number(params.pageSize) || 10
+    let list = [...mockTags]
+    if (params?.keyword) {
+      const kw = String(params.keyword).toLowerCase()
+      list = list.filter(t => t.name.toLowerCase().includes(kw))
+    }
+    const total = list.length
+    return ok({
+      data: list.slice((page - 1) * ps, page * ps),
+      total, page, pageSize: ps, totalPages: Math.ceil(total / ps),
+    } as PaginatedResponse<Tag>)
+  },
 
   // 创建标签
   [R('POST', /^\/tags$/)]: (_, data) => {
@@ -434,10 +461,16 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     } as PaginatedResponse<ArticleListItem>)
   },
 
-  // ---- 待审核文章列表（status=2）----
-  [R('GET', /^\/posts\/pending$/)]: () => {
+  // ---- 待审核文章列表（status=2，分页）----
+  [R('GET', /^\/posts\/pending$/)]: (_, __, params) => {
     const pending = mockArticles.filter(a => a.status === 2)
-    return ok(pending)
+    const page = Number(params?.page) || 1
+    const ps = Number(params?.pageSize) || 10
+    const total = pending.length
+    return ok({
+      data: pending.slice((page - 1) * ps, page * ps),
+      total, page, pageSize: ps, totalPages: Math.ceil(total / ps),
+    } as PaginatedResponse<ArticleListItem>)
   },
 
   // ---- 审核通过（2→1）----

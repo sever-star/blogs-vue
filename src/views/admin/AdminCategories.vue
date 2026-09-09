@@ -25,6 +25,19 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination">
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          background
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
 
     <!-- 新建 / 编辑分类弹窗 -->
@@ -73,7 +86,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { useCategoryStore } from '@/stores/category'
-import { createCategory, updateCategory, deleteCategory } from '@/api/category'
+import { createCategory, updateCategory, deleteCategory, getCategoriesPaged } from '@/api/category'
 import type { Category } from '@/types'
 
 const categoryStore = useCategoryStore()
@@ -81,6 +94,9 @@ const categoryStore = useCategoryStore()
 const categories = ref<Category[]>([])
 const loading = ref(false)
 const saving = ref(false)
+const page = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
 const dialogVisible = ref(false)
 const form = ref({
   name: '',
@@ -89,16 +105,34 @@ const form = ref({
 })
 const editingCategory = ref<Category | null>(null)
 
+/** 加载当前页分类（删光当前页最后一行时自动回退一页） */
 async function loadCategories() {
   loading.value = true
   try {
-    await categoryStore.fetchCategories(true)
-    categories.value = [...categoryStore.categories]
-  } catch (e) {
-    ElMessage.error('加载分类失败')
+    const res = await getCategoriesPaged({ page: page.value, pageSize: pageSize.value })
+    categories.value = res.data
+    total.value = res.total
+    // 删光当前页最后一行：页码回退并重载
+    if (categories.value.length === 0 && page.value > 1) {
+      page.value -= 1
+      await loadCategories()
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载分类失败')
   } finally {
     loading.value = false
   }
+}
+
+function handlePageChange(p: number) {
+  page.value = p
+  loadCategories()
+}
+
+function handleSizeChange(s: number) {
+  pageSize.value = s
+  page.value = 1
+  loadCategories()
 }
 
 function openCreate() {
@@ -129,7 +163,7 @@ async function handleSubmit() {
     ElMessage.warning('请输入分类名')
     return
   }
-  // 重名校验：已存在同名分类时拒绝（编辑时排除自身）
+  // 重名校验：仅扫当前页（兜底提示，唯一性由后端 400 保证）
   const existing = categories.value.find(
     (c) => c.name.trim().toLowerCase() === trimmedName.toLowerCase() && c.id !== editingCategory.value?.id
   )
@@ -181,7 +215,7 @@ async function handleDelete(category: Category) {
 }
 
 async function refreshAndReload() {
-  // 清空 store 缓存并重新加载
+  // 失效选择器缓存并重载当前页
   categoryStore.clearCategories()
   await loadCategories()
 }
@@ -214,5 +248,11 @@ onMounted(async () => {
   font-size: 16px;
   font-weight: 600;
   color: #1f2937;
+}
+
+.pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 </style>

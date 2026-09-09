@@ -1,7 +1,7 @@
 import client from './client'
-import type { Article, ArticleListItem, Tag, Category, ArticleQueryParams, ArticlePayload, PaginatedResponse } from '@/types'
+import type { Article, ArticleListItem, Tag, Category, ArticleQueryParams, ArticlePayload, PageQuery, PaginatedResponse } from '@/types'
 
-export type { ArticleQueryParams, ArticlePayload, PaginatedResponse }
+export type { ArticleQueryParams, ArticlePayload, PageQuery, PaginatedResponse }
 
 /**
  * 获取所有分类
@@ -68,11 +68,13 @@ export const deleteArticle = async (id: number): Promise<void> => {
 }
 
 /**
- * 获取待审核文章列表（status=2）
- * GET /posts/pending
+ * 获取待审核文章列表（status=2，分页）
+ * GET /posts/pending?page=&pageSize=
  */
-export const getPendingArticles = async (): Promise<ArticleListItem[]> => {
-  return client.get('/posts/pending')
+export const getPendingArticles = async (
+  params?: PageQuery
+): Promise<PaginatedResponse<ArticleListItem>> => {
+  return client.get('/posts/pending', { params })
 }
 
 /**

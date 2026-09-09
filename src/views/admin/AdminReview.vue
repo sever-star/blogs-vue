@@ -4,11 +4,11 @@
       <template #header>
         <div class="card-header">
           <span class="card-title">文章审核</span>
-          <span class="card-subtitle">共 {{ articleStore.pendingArticles.length }} 篇待审核</span>
+          <span class="card-subtitle">共 {{ total }} 篇待审核</span>
         </div>
       </template>
 
-      <el-table :data="articleStore.pendingArticles" v-loading="loading" border stripe>
+      <el-table :data="pending" v-loading="loading" border stripe>
         <el-table-column prop="title" label="标题" min-width="220" show-overflow-tooltip />
         <el-table-column prop="authorNickname" label="作者" width="120" />
         <el-table-column label="标签" min-width="160">
@@ -33,7 +33,20 @@
         </el-table-column>
       </el-table>
 
-      <el-empty v-if="!loading && articleStore.pendingArticles.length === 0" description="暂无待审核文章" />
+      <el-empty v-if="!loading && pending.length === 0" description="暂无待审核文章" />
+
+      <div class="pagination">
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          background
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
   </div>
 </template>
@@ -41,20 +54,44 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useArticleStore } from '@/stores/article'
+import { getPendingArticles, approveArticle, rejectArticle } from '@/api/article'
 import type { ArticleListItem } from '@/types'
 
-const articleStore = useArticleStore()
 const loading = ref(false)
 const actingId = ref<number | null>(null)
+const page = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
+const pending = ref<ArticleListItem[]>([])
 
+/** 加载当前页待审核文章（审核最后一篇后自动回退一页） */
 async function loadPending() {
   loading.value = true
   try {
-    await articleStore.fetchPendingArticles()
+    const res = await getPendingArticles({ page: page.value, pageSize: pageSize.value })
+    pending.value = res.data
+    total.value = res.total
+    // 审核掉当前页最后一篇：页码回退并重载
+    if (pending.value.length === 0 && page.value > 1) {
+      page.value -= 1
+      await loadPending()
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载待审核文章失败')
   } finally {
     loading.value = false
   }
+}
+
+function handlePageChange(p: number) {
+  page.value = p
+  loadPending()
+}
+
+function handleSizeChange(s: number) {
+  pageSize.value = s
+  page.value = 1
+  loadPending()
 }
 
 async function handleApprove(row: ArticleListItem) {
@@ -69,8 +106,9 @@ async function handleApprove(row: ArticleListItem) {
   }
   actingId.value = row.id
   try {
-    await articleStore.approveArticle(row.id)
+    await approveArticle(row.id)
     ElMessage.success('已通过，文章已发布')
+    await loadPending()
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
   } finally {
@@ -90,8 +128,9 @@ async function handleReject(row: ArticleListItem) {
   }
   actingId.value = row.id
   try {
-    await articleStore.rejectArticle(row.id)
+    await rejectArticle(row.id)
     ElMessage.success('已驳回，文章退回草稿')
+    await loadPending()
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
   } finally {
@@ -134,5 +173,11 @@ onMounted(loadPending)
 
 .tag {
   margin-right: 4px;
+}
+
+.pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 </style>

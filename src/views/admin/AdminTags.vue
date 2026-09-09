@@ -11,6 +11,19 @@
         </div>
       </template>
 
+      <div class="toolbar">
+        <el-input
+          v-model="keyword"
+          class="keyword-input"
+          placeholder="按标签名搜索"
+          clearable
+          @keyup.enter="handleSearch"
+          @clear="handleSearch"
+        />
+        <el-button type="primary" @click="handleSearch">查询</el-button>
+        <el-button @click="handleReset">重置</el-button>
+      </div>
+
       <el-table :data="tags" v-loading="loading" border stripe>
         <el-table-column prop="name" label="标签名" />
         <el-table-column label="创建时间" width="200">
@@ -29,6 +42,19 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination">
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          background
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
 
     <!-- 新建 / 重命名弹窗 -->
@@ -62,27 +88,74 @@
 import { ref, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus } from "@element-plus/icons-vue";
-import { getTags, createTag, updateTag, deleteTag } from "@/api/tag";
+import {
+  createTag,
+  updateTag,
+  deleteTag,
+  getTagsPaged,
+} from "@/api/tag";
 import type { Tag } from "@/types";
 
 const tags = ref<Tag[]>([]);
 const loading = ref(false);
 const saving = ref(false);
+const page = ref(1);
+const pageSize = ref(10);
+const total = ref(0);
+const keyword = ref("");
+// 实际用于查询的关键词（输入但不查询时不影响列表）
+const appliedKeyword = ref("");
 const dialogVisible = ref(false);
 const form = ref({
   name: "",
 });
 const editingTag = ref<Tag | null>(null);
 
+/** 加载当前页标签（删光当前页最后一行时自动回退一页） */
 async function loadTags() {
   loading.value = true;
   try {
-    tags.value = await getTags();
-  } catch (e) {
-    ElMessage.error("加载标签失败");
+    const res = await getTagsPaged({
+      page: page.value,
+      pageSize: pageSize.value,
+      keyword: appliedKeyword.value || undefined,
+    });
+    tags.value = res.data;
+    total.value = res.total;
+    // 删光当前页最后一行：页码回退并重载
+    if (tags.value.length === 0 && page.value > 1) {
+      page.value -= 1;
+      await loadTags();
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || "加载标签失败");
   } finally {
     loading.value = false;
   }
+}
+
+function handlePageChange(p: number) {
+  page.value = p;
+  loadTags();
+}
+
+function handleSizeChange(s: number) {
+  pageSize.value = s;
+  page.value = 1;
+  loadTags();
+}
+
+function handleSearch() {
+  appliedKeyword.value = keyword.value.trim();
+  page.value = 1;
+  loadTags();
+}
+
+function handleReset() {
+  keyword.value = "";
+  appliedKeyword.value = "";
+  page.value = 1;
+  loadTags();
 }
 
 function openCreate() {
@@ -111,9 +184,11 @@ async function handleSubmit() {
     ElMessage.warning("请输入标签名");
     return;
   }
-  // 重名校验：已存在同名标签时拒绝（编辑时排除自身）
+  // 重名校验：仅扫当前页（兜底提示，唯一性由后端 400 保证）
   const existing = tags.value.find(
-    (t) => t.name.trim().toLowerCase() === trimmed.toLowerCase() && t.id !== editingTag.value?.id
+    (t) =>
+      t.name.trim().toLowerCase() === trimmed.toLowerCase() &&
+      t.id !== editingTag.value?.id
   );
   if (existing) {
     ElMessage.warning(`标签「${existing.name}」已存在`);
@@ -133,7 +208,7 @@ async function handleSubmit() {
       ElMessage.success("标签已创建");
     }
     dialogVisible.value = false;
-    await refreshAndReload();
+    await loadTags();
   } catch (e: any) {
     ElMessage.error(e?.message || "操作失败");
   } finally {
@@ -154,15 +229,10 @@ async function handleDelete(tag: Tag) {
   try {
     await deleteTag(tag.id);
     ElMessage.success("标签已删除");
-    await refreshAndReload();
+    await loadTags();
   } catch (e: any) {
     ElMessage.error(e?.message || "删除失败");
   }
-}
-
-/** 从后端重新拉取标签 */
-async function refreshAndReload() {
-  await loadTags();
 }
 
 function formatDate(date?: string): string {
@@ -197,5 +267,22 @@ onMounted(async () => {
   font-size: 16px;
   font-weight: 600;
   color: #1f2937;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.keyword-input {
+  width: 240px;
+}
+
+.pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 </style>
