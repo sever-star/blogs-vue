@@ -135,10 +135,8 @@ export interface ArticlePayload {
   allowComment?: boolean
 }
 
-/** 文章查询参数 */
+/** 文章查询参数（首页文章列表，不支持分页，仅支持筛选/搜索） */
 export interface ArticleQueryParams {
-  page?: number
-  pageSize?: number
   categoryId?: number
   tagId?: number
   keyword?: string

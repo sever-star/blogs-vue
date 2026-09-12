@@ -452,13 +452,8 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
       const kw = String(params.keyword).toLowerCase()
       list = list.filter(a => a.title.toLowerCase().includes(kw) || a.summary.toLowerCase().includes(kw))
     }
-    const page = Number(params?.page) || 1
-    const ps = Number(params?.pageSize) || 10
-    const total = list.length
-    return ok({
-      data: list.slice((page - 1) * ps, page * ps),
-      total, page, pageSize: ps, totalPages: Math.ceil(total / ps),
-    } as PaginatedResponse<ArticleListItem>)
+    // 首页文章列表不分页，返回过滤后的全量数组
+    return ok(list)
   },
 
   // ---- 待审核文章列表（status=2，分页）----

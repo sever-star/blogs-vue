@@ -271,14 +271,12 @@ Cookie: refreshToken=...   (httpOnly，由浏览器自动携带，无需手动�
 **请求**
 
 ```
-GET /posts?page=1&pageSize=10&categoryId=1&tagId=1&keyword=vue
+GET /posts?categoryId=1&tagId=1&keyword=vue
 ```
 
 **Query 参数**
 | 参数 | 类型 | 必需 | 说明 |
 |-----|------|------|------|
-| page | number | 否 | 当前页码，默认 1 |
-| pageSize | number | 否 | 每页数量，默认 10 |
 | categoryId | number | 否 | 分类ID过滤（按分类筛选文章） |
 | tagId | number | 否 | 标签ID过滤（多标签模型，可按单个标签筛选） |
 | keyword | string | 否 | 标题/内容关键词搜索 |
@@ -289,42 +287,36 @@ GET /posts?page=1&pageSize=10&categoryId=1&tagId=1&keyword=vue
 {
   "code": 0,
   "message": "success",
-  "data": {
-    "data": [
-      {
+  "data": [
+    {
+      "id": 1,
+      "userId": 1,
+      "title": "Vue 3 Composition API 完全指南",
+      "summary": "深入了解 Vue 3 的 Composition API...",
+      "contentMd": "# Vue 3 Composition API...",
+      "coverImage": "https://picsum.photos/800/400?random=1",
+      "readingTime": 15,
+      "viewCount": 1250,
+      "likeCount": 89,
+      "favCount": 42,
+      "commentCount": 12,
+      "status": 1,
+      "allowComment": true,
+      "isTop": false,
+      "publishedAt": "2024-01-15T10:00:00Z",
+      "createdAt": "2024-01-15T10:00:00Z",
+      "updatedAt": "2024-01-20T14:30:00Z",
+      "category": {
         "id": 1,
-        "userId": 1,
-        "title": "Vue 3 Composition API 完全指南",
-        "summary": "深入了解 Vue 3 的 Composition API...",
-        "contentMd": "# Vue 3 Composition API...",
-        "coverImage": "https://picsum.photos/800/400?random=1",
-        "readingTime": 15,
-        "viewCount": 1250,
-        "likeCount": 89,
-        "favCount": 42,
-        "commentCount": 12,
-        "status": 1,
-        "allowComment": true,
-        "isTop": false,
-        "publishedAt": "2024-01-15T10:00:00Z",
-        "createdAt": "2024-01-15T10:00:00Z",
-        "updatedAt": "2024-01-20T14:30:00Z",
-        "category": {
-          "id": 1,
-          "name": "技术"
-        },
-        "tags": [
-          { "id": 1, "name": "Vue", "createdAt": "2024-01-01T00:00:00Z" }
-        ],
-        "authorNickname": "张三",
-        "authorAvatar": "https://example.com/avatar.jpg"
-      }
-    ],
-    "total": 50,
-    "page": 1,
-    "pageSize": 10,
-    "totalPages": 5
-  }
+        "name": "技术"
+      },
+      "tags": [
+        { "id": 1, "name": "Vue", "createdAt": "2024-01-01T00:00:00Z" }
+      ],
+      "authorNickname": "张三",
+      "authorAvatar": "https://example.com/avatar.jpg"
+    }
+  ]
 }
 ```
 
@@ -334,6 +326,7 @@ GET /posts?page=1&pageSize=10&categoryId=1&tagId=1&keyword=vue
 - 返回已发布的文章（status=1）
 - 按 `publishedAt` 倒序排列
 - 列表接口不返回 `contentMd` 和 `contentHtml` 完整内容，仅返回 `summary`
+- 不支持分页（首页文章列表）；管理端文章审核列表的分页见 `GET /posts/pending`
 
 ---
 
@@ -572,10 +565,10 @@ Authorization: Bearer {accessToken}
 
 **Query 参数**
 
-| 参数 | 类型 | 必填 | 默认值 | 说明 |
-|-----|------|:----:|-------|------|
-| page | number | 否 | 1 | 页码，从 1 开始 |
-| pageSize | number | 否 | 10 | 每页条数 |
+| 参数     | 类型   | 必填 | 默认值 | 说明            |
+| -------- | ------ | :--: | ------ | --------------- |
+| page     | number |  否  | 1      | 页码，从 1 开始 |
+| pageSize | number |  否  | 10     | 每页条数        |
 
 **返回**
 
@@ -592,7 +585,9 @@ Authorization: Bearer {accessToken}
         "authorNickname": "zhangsan",
         "status": 2,
         "createdAt": "2024-01-20T14:30:00Z",
-        "tags": [{ "id": 1, "name": "Vue", "createdAt": "2024-01-01T00:00:00Z" }]
+        "tags": [
+          { "id": 1, "name": "Vue", "createdAt": "2024-01-01T00:00:00Z" }
+        ]
       }
     ],
     "total": 1,
@@ -1074,10 +1069,10 @@ GET /categories?page=1&pageSize=10
 
 **Query 参数**
 
-| 参数 | 类型 | 必填 | 默认值 | 说明 |
-|-----|------|:----:|-------|------|
-| page | number | 否 | - | 页码，从 1 开始。传入后启用分页 |
-| pageSize | number | 否 | - | 每页条数，启用分页时生效 |
+| 参数     | 类型   | 必填 | 默认值 | 说明                            |
+| -------- | ------ | :--: | ------ | ------------------------------- |
+| page     | number |  否  | -      | 页码，从 1 开始。传入后启用分页 |
+| pageSize | number |  否  | -      | 每页条数，启用分页时生效        |
 
 **返回**
 
@@ -1320,11 +1315,11 @@ GET /tags?page=1&pageSize=10&keyword=Vue
 
 **Query 参数**
 
-| 参数 | 类型 | 必填 | 默认值 | 说明 |
-|-----|------|:----:|-------|------|
-| keyword | string | 否 | - | 标签名搜索关键词（模糊匹配，仅在分页形态下生效） |
-| page | number | 否 | - | 页码，从 1 开始。传入后启用分页 |
-| pageSize | number | 否 | - | 每页条数，启用分页时生效 |
+| 参数     | 类型   | 必填 | 默认值 | 说明                                             |
+| -------- | ------ | :--: | ------ | ------------------------------------------------ |
+| keyword  | string |  否  | -      | 标签名搜索关键词（模糊匹配，仅在分页形态下生效） |
+| page     | number |  否  | -      | 页码，从 1 开始。传入后启用分页                  |
+| pageSize | number |  否  | -      | 每页条数，启用分页时生效                         |
 
 **返回**
 
@@ -1380,6 +1375,7 @@ GET /tags?page=1&pageSize=10&keyword=Vue
 
 **备注**
 
+- 不需要认证
 - 不需要认证
 - 该接口同时服务于「标签下拉选择器」（需全量数组）与「后台标签表格」（需分页 + 搜索），通过是否传分页参数区分响应形态
 

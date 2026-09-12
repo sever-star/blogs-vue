@@ -138,15 +138,13 @@ export const useArticleStore = defineStore('article', () => {
     }
   }
 
-  /** 获取文章列表（分页） */
+  /** 获取文章列表（前端本地分页/滚动加载；服务端不分页） */
   const fetchArticles = async (page: number = 1, tagId?: number | null, categoryId?: number | null, params?: ArticleQueryParams) => {
     loading.value = true
     try {
-      // TODO: 接入真实 API: GET /posts
-      // const res = await getArticlesApi({ page, pageSize: pageSize, categoryId: categoryId ?? undefined, tagId: tagId ?? undefined, ...params })
-      // articles.value = res.data
-      // totalCount.value = res.total
-      // totalPages.value = res.totalPages
+      // TODO: 接入真实 API: GET /posts（不分页，返回全量数组）
+      // articles.value = await getArticlesApi({ categoryId: categoryId ?? undefined, tagId: tagId ?? undefined, ...params })
+      // totalCount.value = articles.value.length
 
       currentPage.value = page
       if (categoryId !== undefined) {

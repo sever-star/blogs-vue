@@ -20,10 +20,10 @@ export const getTags = async (): Promise<Tag[]> => {
 }
 
 /**
- * 获取文章列表（分页、筛选、搜索）
+ * 获取文章列表（筛选、搜索，不分页）
  * GET /posts
  */
-export const getArticles = async (params?: ArticleQueryParams): Promise<PaginatedResponse<ArticleListItem>> => {
+export const getArticles = async (params?: ArticleQueryParams): Promise<ArticleListItem[]> => {
   return client.get('/posts', { params })
 }
 
