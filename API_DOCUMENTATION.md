@@ -1025,8 +1025,8 @@ Content-Type: application/json
 ```json
 {
   "name": "string (分类名，1-20 字符，必填，唯一)",
-  "description": "string (分类描述，可选)",
-  "icon": "string (分类图标URL，可选)"
+  "parentId": "number (父分类ID，0=顶级，可选，默认 0)",
+  "sortOrder": "number (排序序号，可选，默认 0)"
 }
 ```
 
@@ -1039,9 +1039,8 @@ Content-Type: application/json
   "data": {
     "id": 1,
     "name": "技术",
-    "description": "技术相关文章",
-    "icon": null,
-    "articleCount": 0,
+    "parentId": 0,
+    "sortOrder": 0,
     "createdAt": "2024-01-20T14:30:00Z"
   }
 }
@@ -1088,15 +1087,15 @@ GET /categories?page=1&pageSize=10
     {
       "id": 1,
       "name": "技术",
-      "description": "技术相关文章",
-      "articleCount": 15,
+      "parentId": 0,
+      "sortOrder": 0,
       "createdAt": "2024-01-01T00:00:00Z"
     },
     {
       "id": 2,
       "name": "生活",
-      "description": "生活感悟分享",
-      "articleCount": 8,
+      "parentId": 0,
+      "sortOrder": 1,
       "createdAt": "2024-01-02T00:00:00Z"
     }
   ]
@@ -1114,15 +1113,15 @@ GET /categories?page=1&pageSize=10
       {
         "id": 1,
         "name": "技术",
-        "description": "技术相关文章",
-        "articleCount": 15,
+        "parentId": 0,
+        "sortOrder": 0,
         "createdAt": "2024-01-01T00:00:00Z"
       },
       {
         "id": 2,
         "name": "生活",
-        "description": "生活感悟分享",
-        "articleCount": 8,
+        "parentId": 0,
+        "sortOrder": 1,
         "createdAt": "2024-01-02T00:00:00Z"
       }
     ],
@@ -1162,8 +1161,8 @@ GET /categories/{id}
   "data": {
     "id": 1,
     "name": "技术",
-    "description": "技术相关文章",
-    "articleCount": 15,
+    "parentId": 0,
+    "sortOrder": 0,
     "createdAt": "2024-01-01T00:00:00Z"
   }
 }
@@ -1195,8 +1194,8 @@ Content-Type: application/json
 ```json
 {
   "name": "string (新分类名，1-20 字符，可选)",
-  "description": "string (新描述，可选)",
-  "icon": "string (新图标URL，可选)"
+  "parentId": "number (新父分类ID，可选)",
+  "sortOrder": "number (新排序序号，可选)"
 }
 ```
 
@@ -1209,10 +1208,9 @@ Content-Type: application/json
   "data": {
     "id": 1,
     "name": "前端技术",
-    "description": "前端开发相关技术",
-    "articleCount": 15,
-    "createdAt": "2024-01-01T00:00:00Z",
-    "updatedAt": "2024-01-20T14:30:00Z"
+    "parentId": 0,
+    "sortOrder": 0,
+    "createdAt": "2024-01-01T00:00:00Z"
   }
 }
 ```
@@ -1253,7 +1251,7 @@ Authorization: Bearer {accessToken}
 
 - 401: 未登录
 - 404: 分类不存在
-- 400: 该分类下还有文章，无法删除
+- 400: 该分类下有子分类，无法删除
 
 ---
 

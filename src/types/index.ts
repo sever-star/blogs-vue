@@ -30,9 +30,10 @@ export interface User {
 export interface Category {
   id: number
   name: string
-  description?: string
-  icon?: string
-  articleCount: number
+  /** 父分类 ID，0 代表顶级分类 */
+  parentId: number
+  /** 排序序号，越小越靠前 */
+  sortOrder: number
   createdAt: string
 }
 

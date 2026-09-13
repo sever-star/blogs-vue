@@ -16,7 +16,6 @@
                 :label="category.id"
               >
                 {{ category.name }}
-                <span class="category-count">({{ category.articleCount }})</span>
               </el-radio-button>
             </el-radio-group>
           </div>

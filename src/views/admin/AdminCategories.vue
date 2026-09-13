@@ -13,8 +13,7 @@
 
       <el-table :data="categories" v-loading="loading" border stripe>
         <el-table-column prop="name" label="分类名" />
-        <el-table-column prop="description" label="描述" show-overflow-tooltip />
-        <el-table-column prop="articleCount" label="文章数" width="100" align="center" />
+        <el-table-column prop="sortOrder" label="排序" width="80" align="center" />
         <el-table-column label="创建时间" width="200">
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
@@ -56,21 +55,19 @@
             show-word-limit
           />
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input
-            v-model="form.description"
-            type="textarea"
-            placeholder="请输入分类描述（可选）"
-            maxlength="200"
-            show-word-limit
-            :rows="3"
-          />
+        <el-form-item label="父分类">
+          <el-select v-model="form.parentId" placeholder="请选择父分类">
+            <el-option :value="0" label="顶级分类" />
+            <el-option
+              v-for="c in parentOptions"
+              :key="c.id"
+              :value="c.id"
+              :label="c.name"
+            />
+          </el-select>
         </el-form-item>
-        <el-form-item label="图标URL">
-          <el-input
-            v-model="form.icon"
-            placeholder="请输入图标URL（可选）"
-          />
+        <el-form-item label="排序">
+          <el-input-number v-model="form.sortOrder" :min="0" controls-position="right" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -82,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { useCategoryStore } from '@/stores/category'
@@ -100,10 +97,15 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const form = ref({
   name: '',
-  description: '',
-  icon: ''
+  parentId: 0,
+  sortOrder: 0
 })
 const editingCategory = ref<Category | null>(null)
+
+/** 父分类可选项：全量分类中排除当前编辑项自身，避免把自己设为自己的父分类 */
+const parentOptions = computed(() =>
+  categoryStore.categories.filter(c => c.id !== editingCategory.value?.id)
+)
 
 /** 加载当前页分类（删光当前页最后一行时自动回退一页） */
 async function loadCategories() {
@@ -137,7 +139,7 @@ function handleSizeChange(s: number) {
 
 function openCreate() {
   editingCategory.value = null
-  form.value = { name: '', description: '', icon: '' }
+  form.value = { name: '', parentId: 0, sortOrder: 0 }
   dialogVisible.value = true
 }
 
@@ -145,15 +147,15 @@ function openEdit(category: Category) {
   editingCategory.value = category
   form.value = {
     name: category.name,
-    description: category.description || '',
-    icon: category.icon || ''
+    parentId: category.parentId,
+    sortOrder: category.sortOrder
   }
   dialogVisible.value = true
 }
 
 function resetDialog() {
   editingCategory.value = null
-  form.value = { name: '', description: '', icon: '' }
+  form.value = { name: '', parentId: 0, sortOrder: 0 }
 }
 
 async function handleSubmit() {
@@ -175,8 +177,8 @@ async function handleSubmit() {
   try {
     const payload = {
       name: trimmedName,
-      description: form.value.description.trim() || undefined,
-      icon: form.value.icon.trim() || undefined
+      parentId: form.value.parentId,
+      sortOrder: form.value.sortOrder
     }
 
     if (editingCategory.value) {
@@ -228,6 +230,8 @@ function formatDate(date?: string): string {
 }
 
 onMounted(async () => {
+  // 父分类选择器需要全量分类，先拉取；再加载管理表格分页数据
+  await categoryStore.fetchCategories()
   await loadCategories()
 })
 </script>

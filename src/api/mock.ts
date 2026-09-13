@@ -331,9 +331,8 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     const category: Category = {
       id: Math.max(...mockCategories.map(c => c.id), 0) + 1,
       name,
-      description: data?.description || '',
-      icon: data?.icon || '',
-      articleCount: 0,
+      parentId: Number(data?.parentId) || 0,
+      sortOrder: Number(data?.sortOrder) || 0,
       createdAt: new Date().toISOString(),
     }
     mockCategories.push(category)
@@ -357,8 +356,8 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     if (!name) return err(400, '分类名不能为空')
     if (mockCategories.some(c => c.id !== id && c.name === name)) return err(400, '分类名已存在')
     if (data?.name) category.name = name
-    if (data?.description !== undefined) category.description = data.description
-    if (data?.icon !== undefined) category.icon = data.icon
+    if (data?.parentId !== undefined) category.parentId = Number(data.parentId)
+    if (data?.sortOrder !== undefined) category.sortOrder = Number(data.sortOrder)
     return ok(category)
   },
 
@@ -367,8 +366,7 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     const id = extractArticleId(url, /^\/categories\/(\d+)$/)
     const idx = mockCategories.findIndex(c => c.id === id)
     if (idx === -1) return err(404, '分类不存在')
-    const category = mockCategories[idx]
-    if (category.articleCount > 0) return err(400, '该分类下还有文章，无法删除')
+    if (mockCategories.some(c => c.parentId === id)) return err(400, '该分类下有子分类，无法删除')
     mockCategories.splice(idx, 1)
     return ok(null)
   },

@@ -22,8 +22,8 @@ const USE_BACKEND = import.meta.env.VITE_USE_BACKEND === 'true'
 /** 分类请求体 */
 export interface CategoryPayload {
   name: string
-  description?: string
-  icon?: string
+  parentId?: number
+  sortOrder?: number
 }
 
 /**
