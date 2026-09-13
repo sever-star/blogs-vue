@@ -5,19 +5,47 @@
       <div class="main-column">
         <!-- 分类选择栏 -->
         <div class="category-section">
-          <div class="category-tabs">
-            <el-radio-group v-model="selectedCategory" @change="handleCategoryChange">
-              <el-radio-button label="all">
-                <el-icon><Document /></el-icon> 全部
-              </el-radio-button>
-              <el-radio-button
-                v-for="category in articleStore.categories"
-                :key="category.id"
-                :label="category.id"
-              >
-                {{ category.name }}
-              </el-radio-button>
-            </el-radio-group>
+          <div class="category-tabs-wrapper">
+            <div
+              ref="categoryTabsRef"
+              class="category-tabs"
+              @scroll="updateScrollState"
+            >
+              <el-radio-group v-model="selectedCategory" @change="handleCategoryChange">
+                <el-radio-button label="all">
+                  <el-icon><Document /></el-icon> 全部
+                </el-radio-button>
+                <el-radio-button
+                  v-for="category in articleStore.categories"
+                  :key="category.id"
+                  :label="category.id"
+                >
+                  {{ category.name }}
+                </el-radio-button>
+              </el-radio-group>
+            </div>
+
+            <!-- 左右滑动箭头（溢出且未到头时显示） -->
+            <button
+              v-show="canScrollLeft"
+              class="scroll-arrow scroll-arrow--left"
+              aria-label="向左滑动"
+              @mousedown="startScroll(-1)"
+              @mouseup="stopScroll"
+              @mouseleave="stopScroll"
+            >
+              <el-icon><ArrowLeft /></el-icon>
+            </button>
+            <button
+              v-show="canScrollRight"
+              class="scroll-arrow scroll-arrow--right"
+              aria-label="向右滑动"
+              @mousedown="startScroll(1)"
+              @mouseup="stopScroll"
+              @mouseleave="stopScroll"
+            >
+              <el-icon><ArrowRight /></el-icon>
+            </button>
           </div>
 
           <!-- 标签筛选栏 -->
@@ -92,11 +120,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useArticleStore } from '@/stores/article'
 import { ElMessage } from 'element-plus'
 import ArticleCard from '@/components/ArticleCard.vue'
-import { Document } from '@element-plus/icons-vue'
+import { Document, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 
 const articleStore = useArticleStore()
 const scrollTrigger = ref<HTMLElement>()
@@ -111,6 +139,41 @@ const allTags = computed(() => {
 
 // 当前选中的分类（'all' 表示全部，数字表示具体分类）
 const selectedCategory = ref<'all' | number>('all')
+
+// 分类栏左右滑动箭头
+const categoryTabsRef = ref<HTMLElement>()
+const canScrollLeft = ref(false)
+const canScrollRight = ref(false)
+let scrollTimer: number | undefined
+
+function updateScrollState() {
+  const el = categoryTabsRef.value
+  if (!el) return
+  canScrollLeft.value = el.scrollLeft > 1
+  canScrollRight.value = el.scrollLeft < el.scrollWidth - el.clientWidth - 1
+}
+
+/** 按住箭头连续滚动；松开或移出即停 */
+function startScroll(dir: number) {
+  const el = categoryTabsRef.value
+  if (!el) return
+  stopScroll()
+  scrollTimer = window.setInterval(() => {
+    el.scrollBy({ left: dir * 20 })
+    updateScrollState()
+  }, 16)
+}
+function stopScroll() {
+  if (scrollTimer !== undefined) {
+    clearInterval(scrollTimer)
+    scrollTimer = undefined
+  }
+}
+
+// 分类数据变化后重新计算箭头显隐
+watch(() => articleStore.categories.length, () => {
+  nextTick(updateScrollState)
+})
 
 // 初始化加载
 onMounted(async () => {
@@ -129,6 +192,7 @@ setupIntersectionObserver()
 
 onUnmounted(() => {
   observer?.disconnect()
+  stopScroll()
 })
 
 // Intersection Observer 用于无限滚动
@@ -212,11 +276,14 @@ function handleLoadMore() {
   min-width: 0;
 }
 
-/* 分类按钮栏：溢出时左右滑动浏览，隐藏滚动条 */
+/* 分类栏：横向滚动 + 左右箭头滑动（仅电脑端） */
+.category-tabs-wrapper {
+  position: relative;
+}
+
 .category-tabs {
   display: flex;
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
 
@@ -233,6 +300,40 @@ function handleLoadMore() {
 
 .category-tabs :deep(.el-radio-button) {
   flex-shrink: 0;
+}
+
+/* 左右滑动箭头按钮 */
+.scroll-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  color: #4b5563;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.scroll-arrow:hover {
+  background: #fff;
+  color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.scroll-arrow--left {
+  left: -6px;
+}
+
+.scroll-arrow--right {
+  right: -6px;
 }
 
 .tags-section {
