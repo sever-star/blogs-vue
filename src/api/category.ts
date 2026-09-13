@@ -22,7 +22,6 @@ const USE_BACKEND = import.meta.env.VITE_USE_BACKEND === 'true'
 /** 分类请求体 */
 export interface CategoryPayload {
   name: string
-  parentId?: number
   sortOrder?: number
 }
 

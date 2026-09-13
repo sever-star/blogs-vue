@@ -1120,6 +1120,10 @@ Authorization: Bearer {accessToken}
 
 分类是文章的一级分类，如"技术"、"生活"、"教程"等。一个分类下可以有多篇文章。
 
+> **结构说明**：分类为**扁平结构**，每个分类都是彼此独立的一级分类，不存在父子层级
+> （原 `parentId` / `parent_id` 无限极设计已移除，与标签的定位一致）。
+> 分类选择器与管理表格均基于同一份全量列表，无需 `/top` / `/sub/{parentId}` 之类接口。
+
 > **数据源说明（前端）**
 > 后端接口就绪前，前端使用 `src/constants/categories.ts` 中的固定分类数据兜底；
 > 数据源由 `VITE_USE_MOCK` / `VITE_USE_BACKEND` 两个开关控制（见 `.env.example`）：
@@ -1143,7 +1147,6 @@ Content-Type: application/json
 ```json
 {
   "name": "string (分类名，1-20 字符，必填，唯一)",
-  "parentId": "number (父分类ID，0=顶级，可选，默认 0)",
   "sortOrder": "number (排序序号，可选，默认 0)"
 }
 ```
@@ -1157,7 +1160,6 @@ Content-Type: application/json
   "data": {
     "id": 1,
     "name": "技术",
-    "parentId": 0,
     "sortOrder": 0,
     "createdAt": "2024-01-20T14:30:00Z"
   }
@@ -1206,14 +1208,12 @@ GET /categories?keyword=技术
     {
       "id": 1,
       "name": "技术",
-      "parentId": 0,
       "sortOrder": 0,
       "createdAt": "2024-01-01T00:00:00Z"
     },
     {
       "id": 2,
       "name": "生活",
-      "parentId": 0,
       "sortOrder": 1,
       "createdAt": "2024-01-02T00:00:00Z"
     }
@@ -1255,7 +1255,6 @@ GET /categories/page?page=1&pageSize=10&keyword=技术
       {
         "id": 1,
         "name": "技术",
-        "parentId": 0,
         "sortOrder": 0,
         "createdAt": "2024-01-01T00:00:00Z"
       }
@@ -1297,7 +1296,6 @@ GET /categories/{id}
   "data": {
     "id": 1,
     "name": "技术",
-    "parentId": 0,
     "sortOrder": 0,
     "createdAt": "2024-01-01T00:00:00Z"
   }
@@ -1330,7 +1328,6 @@ Content-Type: application/json
 ```json
 {
   "name": "string (新分类名，1-20 字符，可选)",
-  "parentId": "number (新父分类ID，可选)",
   "sortOrder": "number (新排序序号，可选)"
 }
 ```
@@ -1344,7 +1341,6 @@ Content-Type: application/json
   "data": {
     "id": 1,
     "name": "前端技术",
-    "parentId": 0,
     "sortOrder": 0,
     "createdAt": "2024-01-01T00:00:00Z"
   }
@@ -1387,7 +1383,6 @@ Authorization: Bearer {accessToken}
 
 - 401: 未登录
 - 404: 分类不存在
-- 400: 该分类下有子分类，无法删除
 
 ---
 
@@ -2082,13 +2077,13 @@ CREATE TABLE blog_posts (
 );
 ```
 
-#### blog_categories 表（分类，无限极 parent_id）
+#### blog_categories 表（分类，扁平结构无层级）
 
 ```sql
 CREATE TABLE blog_categories (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(50) NOT NULL COMMENT '分类名（未设唯一约束）',
-  parent_id INT UNSIGNED DEFAULT 0 COMMENT '父分类ID,0=顶级',
+  -- parent_id 列已从实体移除，因 ddl-auto=update 不会自动删列，旧库需手动 DROP
   sort_order INT NOT NULL DEFAULT 0 COMMENT '排序,越小越靠前',
   created_at DATETIME NOT NULL
   -- 注意：无 updated_at；name 无唯一约束
@@ -2481,6 +2476,8 @@ JPA 默认 `Boolean` ↔ `TINYINT(1)`；前端需确保收到 `0/1` 时按布尔
 | 文档路径 | 后端现状 | 差异说明 |
 | --- | --- | --- |
 | `GET /categories` 返回 `Category[]` 或分页 | 已拆为 `GET /categories`→`Result<List<BlogCategory>>` + `GET /categories/page`→`Result<PageResult>`（已修复） | 与标签同步修复：原 `Result<Object>` 分支返回不稳定，**已修复**。前端 `getCategoriesPaged` URL 已改 `/categories/page` |
+| 分类层级（`parentId` / `parent_id`） | **已移除**：`BlogCategory`、`CategoryDTO` 不再含 `parentId`；`findByParentId`、`getTopCategories`、`getSubCategories`、`GET /top`、`GET /sub/{parentId}` 全部删除 | 分类改为扁平结构，每个分类都是独立的一级分类，与标签定位一致；前端 `AdminCategories` 的「父分类」选择器同步删除 |
+| 删除分类的子分类校验 | 已移除：`DELETE /categories/{id}` 不再检查 `parentId === id` | 无层级后不存在子分类，删除即删；mock 层同步删除该校验 |
 
 ### 6. 缺失的控制器（文档有、后端无）
 

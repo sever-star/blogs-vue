@@ -36,10 +36,10 @@ export const useArticleStore = defineStore('article', () => {
   // ========== Mock 数据 (开发阶段使用) ==========
 
   const mockCategories: Category[] = [
-    { id: 1, name: '技术', parentId: 0, sortOrder: 0, createdAt: '2024-01-01T00:00:00Z' },
-    { id: 2, name: '生活', parentId: 0, sortOrder: 1, createdAt: '2024-01-02T00:00:00Z' },
-    { id: 3, name: '教程', parentId: 0, sortOrder: 2, createdAt: '2024-01-03T00:00:00Z' },
-    { id: 4, name: '分享', parentId: 0, sortOrder: 3, createdAt: '2024-01-04T00:00:00Z' },
+    { id: 1, name: '技术', sortOrder: 0, createdAt: '2024-01-01T00:00:00Z' },
+    { id: 2, name: '生活', sortOrder: 1, createdAt: '2024-01-02T00:00:00Z' },
+    { id: 3, name: '教程', sortOrder: 2, createdAt: '2024-01-03T00:00:00Z' },
+    { id: 4, name: '分享', sortOrder: 3, createdAt: '2024-01-04T00:00:00Z' },
   ]
 
   const mockTags: Tag[] = [

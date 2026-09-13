@@ -55,17 +55,6 @@
             show-word-limit
           />
         </el-form-item>
-        <el-form-item label="父分类">
-          <el-select v-model="form.parentId" placeholder="请选择父分类">
-            <el-option :value="0" label="顶级分类" />
-            <el-option
-              v-for="c in parentOptions"
-              :key="c.id"
-              :value="c.id"
-              :label="c.name"
-            />
-          </el-select>
-        </el-form-item>
         <el-form-item label="排序">
           <el-input-number v-model="form.sortOrder" :min="0" controls-position="right" />
         </el-form-item>
@@ -79,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { useCategoryStore } from '@/stores/category'
@@ -97,15 +86,9 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const form = ref({
   name: '',
-  parentId: 0,
   sortOrder: 0
 })
 const editingCategory = ref<Category | null>(null)
-
-/** 父分类可选项：全量分类中排除当前编辑项自身，避免把自己设为自己的父分类 */
-const parentOptions = computed(() =>
-  categoryStore.categories.filter(c => c.id !== editingCategory.value?.id)
-)
 
 /** 加载当前页分类（删光当前页最后一行时自动回退一页） */
 async function loadCategories() {
@@ -139,7 +122,7 @@ function handleSizeChange(s: number) {
 
 function openCreate() {
   editingCategory.value = null
-  form.value = { name: '', parentId: 0, sortOrder: 0 }
+  form.value = { name: '', sortOrder: 0 }
   dialogVisible.value = true
 }
 
@@ -147,7 +130,6 @@ function openEdit(category: Category) {
   editingCategory.value = category
   form.value = {
     name: category.name,
-    parentId: category.parentId,
     sortOrder: category.sortOrder
   }
   dialogVisible.value = true
@@ -155,7 +137,7 @@ function openEdit(category: Category) {
 
 function resetDialog() {
   editingCategory.value = null
-  form.value = { name: '', parentId: 0, sortOrder: 0 }
+  form.value = { name: '', sortOrder: 0 }
 }
 
 async function handleSubmit() {
@@ -177,7 +159,6 @@ async function handleSubmit() {
   try {
     const payload = {
       name: trimmedName,
-      parentId: form.value.parentId,
       sortOrder: form.value.sortOrder
     }
 
@@ -230,8 +211,6 @@ function formatDate(date?: string): string {
 }
 
 onMounted(async () => {
-  // 父分类选择器需要全量分类，先拉取；再加载管理表格分页数据
-  await categoryStore.fetchCategories()
   await loadCategories()
 })
 </script>

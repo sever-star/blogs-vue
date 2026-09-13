@@ -26,12 +26,10 @@ export interface User {
 
 // ============ 分类 ============
 
-/** 分类 */
+/** 分类（扁平结构，无层级；与标签一样每个分类都是独立模块） */
 export interface Category {
   id: number
   name: string
-  /** 父分类 ID，0 代表顶级分类 */
-  parentId: number
   /** 排序序号，越小越靠前 */
   sortOrder: number
   createdAt: string

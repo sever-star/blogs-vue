@@ -310,15 +310,27 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
   },
 
   // ---- 分类 ----
+  // 全量分类（选择器用，支持可选 keyword 模糊过滤）
   [R('GET', /^\/categories$/)]: (_, __, params) => {
-    // 不传分页参数：返回全量数组（选择器用，向后兼容）
-    if (params?.page === undefined) return ok(mockCategories)
-    // 传分页参数：返回 PaginatedResponse（管理表格用）
-    const page = Number(params.page) || 1
-    const ps = Number(params.pageSize) || 10
-    const total = mockCategories.length
+    if (params?.keyword) {
+      const kw = String(params.keyword).toLowerCase()
+      return ok(mockCategories.filter(c => c.name.toLowerCase().includes(kw)))
+    }
+    return ok(mockCategories)
+  },
+
+  // 分页分类（管理表格用，支持 keyword 模糊搜索）
+  [R('GET', /^\/categories\/page$/)]: (_, __, params) => {
+    const page = Number(params?.page) || 1
+    const ps = Number(params?.pageSize) || 10
+    let list = [...mockCategories]
+    if (params?.keyword) {
+      const kw = String(params.keyword).toLowerCase()
+      list = list.filter(c => c.name.toLowerCase().includes(kw))
+    }
+    const total = list.length
     return ok({
-      data: mockCategories.slice((page - 1) * ps, page * ps),
+      data: list.slice((page - 1) * ps, page * ps),
       total, page, pageSize: ps, totalPages: Math.ceil(total / ps),
     } as PaginatedResponse<Category>)
   },
@@ -331,7 +343,6 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     const category: Category = {
       id: Math.max(...mockCategories.map(c => c.id), 0) + 1,
       name,
-      parentId: Number(data?.parentId) || 0,
       sortOrder: Number(data?.sortOrder) || 0,
       createdAt: new Date().toISOString(),
     }
@@ -356,7 +367,6 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     if (!name) return err(400, '分类名不能为空')
     if (mockCategories.some(c => c.id !== id && c.name === name)) return err(400, '分类名已存在')
     if (data?.name) category.name = name
-    if (data?.parentId !== undefined) category.parentId = Number(data.parentId)
     if (data?.sortOrder !== undefined) category.sortOrder = Number(data.sortOrder)
     return ok(category)
   },
@@ -366,18 +376,24 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     const id = extractArticleId(url, /^\/categories\/(\d+)$/)
     const idx = mockCategories.findIndex(c => c.id === id)
     if (idx === -1) return err(404, '分类不存在')
-    if (mockCategories.some(c => c.parentId === id)) return err(400, '该分类下有子分类，无法删除')
     mockCategories.splice(idx, 1)
     return ok(null)
   },
 
   // ---- 标签 ----
+  // 全量标签（选择器用，支持可选 keyword 模糊过滤）
   [R('GET', /^\/tags$/)]: (_, __, params) => {
-    // 不传分页参数：返回全量数组（选择器用，向后兼容）
-    if (params?.page === undefined) return ok(mockTags)
-    // 传分页参数：返回 PaginatedResponse（管理表格用），支持 keyword 模糊搜索
-    const page = Number(params.page) || 1
-    const ps = Number(params.pageSize) || 10
+    if (params?.keyword) {
+      const kw = String(params.keyword).toLowerCase()
+      return ok(mockTags.filter(t => t.name.toLowerCase().includes(kw)))
+    }
+    return ok(mockTags)
+  },
+
+  // 分页标签（管理表格用，支持 keyword 模糊搜索）
+  [R('GET', /^\/tags\/page$/)]: (_, __, params) => {
+    const page = Number(params?.page) || 1
+    const ps = Number(params?.pageSize) || 10
     let list = [...mockTags]
     if (params?.keyword) {
       const kw = String(params.keyword).toLowerCase()
