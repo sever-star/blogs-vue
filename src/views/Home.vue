@@ -212,6 +212,29 @@ function handleLoadMore() {
   min-width: 0;
 }
 
+/* 分类按钮栏：溢出时左右滑动浏览，隐藏滚动条 */
+.category-tabs {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.category-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+/* el-radio-group 横向不换行，按钮不被压缩 */
+.category-tabs :deep(.el-radio-group) {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.category-tabs :deep(.el-radio-button) {
+  flex-shrink: 0;
+}
+
 .tags-section {
   background: white;
   border-radius: 8px;
