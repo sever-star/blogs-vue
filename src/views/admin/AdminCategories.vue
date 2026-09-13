@@ -13,7 +13,6 @@
 
       <el-table :data="categories" v-loading="loading" border stripe>
         <el-table-column prop="name" label="分类名" />
-        <el-table-column prop="sortOrder" label="排序" width="80" align="center" />
         <el-table-column label="创建时间" width="200">
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
@@ -55,9 +54,6 @@
             show-word-limit
           />
         </el-form-item>
-        <el-form-item label="排序">
-          <el-input-number v-model="form.sortOrder" :min="0" controls-position="right" />
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -85,8 +81,7 @@ const pageSize = ref(10)
 const total = ref(0)
 const dialogVisible = ref(false)
 const form = ref({
-  name: '',
-  sortOrder: 0
+  name: ''
 })
 const editingCategory = ref<Category | null>(null)
 
@@ -122,22 +117,21 @@ function handleSizeChange(s: number) {
 
 function openCreate() {
   editingCategory.value = null
-  form.value = { name: '', sortOrder: 0 }
+  form.value = { name: '' }
   dialogVisible.value = true
 }
 
 function openEdit(category: Category) {
   editingCategory.value = category
   form.value = {
-    name: category.name,
-    sortOrder: category.sortOrder
+    name: category.name
   }
   dialogVisible.value = true
 }
 
 function resetDialog() {
   editingCategory.value = null
-  form.value = { name: '', sortOrder: 0 }
+  form.value = { name: '' }
 }
 
 async function handleSubmit() {
@@ -158,8 +152,7 @@ async function handleSubmit() {
   saving.value = true
   try {
     const payload = {
-      name: trimmedName,
-      sortOrder: form.value.sortOrder
+      name: trimmedName
     }
 
     if (editingCategory.value) {

@@ -30,8 +30,6 @@ export interface User {
 export interface Category {
   id: number
   name: string
-  /** 排序序号，越小越靠前 */
-  sortOrder: number
   createdAt: string
 }
 

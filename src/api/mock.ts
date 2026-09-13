@@ -343,7 +343,6 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     const category: Category = {
       id: Math.max(...mockCategories.map(c => c.id), 0) + 1,
       name,
-      sortOrder: Number(data?.sortOrder) || 0,
       createdAt: new Date().toISOString(),
     }
     mockCategories.push(category)
@@ -367,7 +366,6 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     if (!name) return err(400, '分类名不能为空')
     if (mockCategories.some(c => c.id !== id && c.name === name)) return err(400, '分类名已存在')
     if (data?.name) category.name = name
-    if (data?.sortOrder !== undefined) category.sortOrder = Number(data.sortOrder)
     return ok(category)
   },
 

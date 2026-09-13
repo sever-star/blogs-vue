@@ -1146,8 +1146,7 @@ Content-Type: application/json
 
 ```json
 {
-  "name": "string (分类名，1-20 字符，必填，唯一)",
-  "sortOrder": "number (排序序号，可选，默认 0)"
+  "name": "string (分类名，1-20 字符，必填，唯一)"
 }
 ```
 
@@ -1160,7 +1159,6 @@ Content-Type: application/json
   "data": {
     "id": 1,
     "name": "技术",
-    "sortOrder": 0,
     "createdAt": "2024-01-20T14:30:00Z"
   }
 }
@@ -1208,13 +1206,11 @@ GET /categories?keyword=技术
     {
       "id": 1,
       "name": "技术",
-      "sortOrder": 0,
       "createdAt": "2024-01-01T00:00:00Z"
     },
     {
       "id": 2,
       "name": "生活",
-      "sortOrder": 1,
       "createdAt": "2024-01-02T00:00:00Z"
     }
   ]
@@ -1255,7 +1251,6 @@ GET /categories/page?page=1&pageSize=10&keyword=技术
       {
         "id": 1,
         "name": "技术",
-        "sortOrder": 0,
         "createdAt": "2024-01-01T00:00:00Z"
       }
     ],
@@ -1296,7 +1291,6 @@ GET /categories/{id}
   "data": {
     "id": 1,
     "name": "技术",
-    "sortOrder": 0,
     "createdAt": "2024-01-01T00:00:00Z"
   }
 }
@@ -1327,8 +1321,7 @@ Content-Type: application/json
 
 ```json
 {
-  "name": "string (新分类名，1-20 字符，可选)",
-  "sortOrder": "number (新排序序号，可选)"
+  "name": "string (新分类名，1-20 字符，可选)"
 }
 ```
 
@@ -1341,7 +1334,6 @@ Content-Type: application/json
   "data": {
     "id": 1,
     "name": "前端技术",
-    "sortOrder": 0,
     "createdAt": "2024-01-01T00:00:00Z"
   }
 }
@@ -2084,7 +2076,7 @@ CREATE TABLE blog_categories (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(50) NOT NULL COMMENT '分类名（未设唯一约束）',
   -- parent_id 列已从实体移除，因 ddl-auto=update 不会自动删列，旧库需手动 DROP
-  sort_order INT NOT NULL DEFAULT 0 COMMENT '排序,越小越靠前',
+  -- sort_order 列已从实体移除，因 ddl-auto=update 不会自动删列，旧库需手动 DROP
   created_at DATETIME NOT NULL
   -- 注意：无 updated_at；name 无唯一约束
 );
