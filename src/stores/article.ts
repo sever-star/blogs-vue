@@ -163,10 +163,7 @@ export const useArticleStore = defineStore('article', () => {
 
   const fetchCategories = async () => {
     try {
-      // TODO: 接入真实 API: GET /categories
-      // const res = await getCategoriesApi()
-      // categories.value = res.data
-      categories.value = mockCategories
+      categories.value = await getCategoriesApi()
     } catch (error) {
       console.error('获取分类列表失败:', error)
     }
