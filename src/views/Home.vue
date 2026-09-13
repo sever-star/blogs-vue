@@ -179,6 +179,9 @@ watch(() => articleStore.categories.length, () => {
 onMounted(async () => {
   try {
     await articleStore.fetchCategories()
+    // 从其他页面返回时 watch（监听 length）不再触发，需显式重算箭头显隐
+    await nextTick()
+    updateScrollState()
     await articleStore.fetchTags()
     await articleStore.fetchArticles()
     await articleStore.fetchTopArticles()
