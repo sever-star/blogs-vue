@@ -28,15 +28,15 @@ export const getTags = async (): Promise<Tag[]> => {
 
 /**
  * 分页获取标签（支持 keyword 模糊搜索）
- * GET /tags?page=&pageSize=&keyword=
+ * GET /tags/page?page=&pageSize=&keyword=
  *
- * 与 getTags 命中同一 endpoint：传 page/pageSize 时后端返回
- * PaginatedResponse<Tag>，管理表格使用。
+ * 与 getTags 拆分为独立 endpoint：本接口固定返回
+ * PaginatedResponse<Tag>，管理表格使用；全量列表请用 getTags。
  */
 export const getTagsPaged = async (
   params: PageQuery & { keyword?: string }
 ): Promise<PaginatedResponse<Tag>> => {
-  return client.get('/tags', { params })
+  return client.get('/tags/page', { params })
 }
 
 /**

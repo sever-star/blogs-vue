@@ -53,15 +53,15 @@ export const getCategories = async (): Promise<Category[]> => {
 
 /**
  * 分页获取分类
- * GET /categories?page=&pageSize=
+ * GET /categories/page?page=&pageSize=
  *
- * 与 getCategories 命中同一 endpoint：传 page/pageSize 时后端返回
- * PaginatedResponse<Category>，管理表格使用。
+ * 与 getCategories 拆分为独立 endpoint：本接口固定返回
+ * PaginatedResponse<Category>，管理表格使用；全量列表请用 getCategories。
  */
 export const getCategoriesPaged = async (
   params: PageQuery
 ): Promise<PaginatedResponse<Category>> => {
-  return client.get('/categories', { params })
+  return client.get('/categories/page', { params })
 }
 
 /**
