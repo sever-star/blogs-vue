@@ -183,7 +183,9 @@ onMounted(async () => {
     await nextTick()
     updateScrollState()
     await articleStore.fetchTags()
-    await articleStore.fetchArticles()
+    // 返回首页时重置为「全部」：显式传 null 清空 store 里的 selectedCategory/selectedTag，
+    // 否则 fetchArticles 无参时保留上次选中的分类，导致按钮显示全部、数据却是旧分类
+    await articleStore.fetchArticles(1, null, null)
     await articleStore.fetchTopArticles()
   } catch (error) {
     ElMessage.error('加载数据失败')
