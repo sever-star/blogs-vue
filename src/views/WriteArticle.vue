@@ -100,6 +100,7 @@ import { useRouter } from 'vue-router'
 import { useArticleStore } from '@/stores/article'
 import { useAuthStore } from '@/stores/auth'
 import { useCategoryStore } from '@/stores/category'
+import { createTag } from '@/api/tag'
 import { ElMessage } from 'element-plus'
 import { MdEditor as MDEditor } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
@@ -125,13 +126,17 @@ const formData = ref({
 
 const availableTags = computed(() => articleStore.tags.map((tag) => tag.name))
 
+// 本次会话内新建标签的名称→id 缓存（allow-create 输入的标签尚未存在于标签列表中）
+const createdTagCache = new Map<string, number>()
+
 // 检查登录状态和加载分类
 onMounted(() => {
   if (!authStore.isLoggedIn) {
     ElMessage.warning('请先登录后才能发表文章')
   }
-  // 加载分类列表
+  // 加载分类与标签列表（标签下拉的数据源）
   categoryStore.fetchCategories()
+  articleStore.fetchTags(true)
 })
 
 function validateForm(): boolean {
@@ -158,6 +163,39 @@ function validateForm(): boolean {
   return true
 }
 
+/**
+ * 把选中的标签名解析成标签 id（后端 POST /posts 只接受 id）。
+ * allow-create 允许输入新标签，需要先创建拿到 id 再关联，
+ * 否则新建的标签名会被静默丢弃，文章最终带上 0 个标签。
+ */
+async function resolveTagIds(names: string[]): Promise<number[]> {
+  const known = new Map(articleStore.tags.map((tag) => [tag.name, tag.id]))
+  createdTagCache.forEach((id, name) => known.set(name, id))
+
+  const ids: number[] = []
+  for (const rawName of names) {
+    const name = rawName.trim()
+    if (!name) continue
+
+    const existingId = known.get(name)
+    if (existingId !== undefined) {
+      ids.push(existingId)
+      continue
+    }
+
+    try {
+      const created = await createTag({ name })
+      known.set(name, created.id)
+      createdTagCache.set(name, created.id)
+      ids.push(created.id)
+    } catch (error) {
+      console.error('创建标签失败:', error)
+      throw error
+    }
+  }
+  return [...new Set(ids)]
+}
+
 async function handlePublish() {
   if (!authStore.isLoggedIn) {
     ElMessage.warning('请先登录')
@@ -171,9 +209,11 @@ async function handlePublish() {
 
   publishing.value = true
   try {
-    const selectedTagIds = articleStore.tags
-      .filter((tag) => formData.value.tags.includes(tag.name))
-      .map((tag) => tag.id)
+    const selectedTagIds = await resolveTagIds(formData.value.tags)
+    if (selectedTagIds.length === 0) {
+      ElMessage.error('标签处理失败，请重试')
+      return
+    }
     await articleStore.createArticle({
       title: formData.value.title,
       contentMd: formData.value.content,

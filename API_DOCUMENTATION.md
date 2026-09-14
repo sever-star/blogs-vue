@@ -51,18 +51,18 @@
 
 ### 错误码说明
 
-| 错误码 | 说明                                              | 处理方式                                   |
-| ------ | ------------------------------------------------- | ------------------------------------------ |
-| 200    | 成功（后端 `Result.success`；前端亦兼容 `0`）     | -                                          |
-| 400    | 请求参数错误 / 校验失败 / 重复命名等业务异常      | 客户端检查参数                             |
-| 401    | 未授权（需要登录）                                | 跳转到登录页                               |
-| 401001 | accessToken 过期（HTTP 401 + 此业务码）           | 前端自动刷新 accessToken；刷新失败则跳登录 |
-| 401002 | accessToken 无效                                  | 清除本地态并跳登录                         |
-| 401003 | accessToken 缺失                                  | 跳转到登录页                               |
-| 401004 | 认证失败（账密错误等）                            | 提示账号或密码错误                         |
-| 403    | 禁止访问（权限不足，如非作者编辑他人文章）        | 提示权限不足                               |
-| 404    | 资源不存在                                        | 提示资源不存在                             |
-| 500    | 服务器内部错误（兜底，不暴露堆栈）                | 提示稍后重试                               |
+| 错误码 | 说明                                          | 处理方式                                   |
+| ------ | --------------------------------------------- | ------------------------------------------ |
+| 200    | 成功（后端 `Result.success`；前端亦兼容 `0`） | -                                          |
+| 400    | 请求参数错误 / 校验失败 / 重复命名等业务异常  | 客户端检查参数                             |
+| 401    | 未授权（需要登录）                            | 跳转到登录页                               |
+| 401001 | accessToken 过期（HTTP 401 + 此业务码）       | 前端自动刷新 accessToken；刷新失败则跳登录 |
+| 401002 | accessToken 无效                              | 清除本地态并跳登录                         |
+| 401003 | accessToken 缺失                              | 跳转到登录页                               |
+| 401004 | 认证失败（账密错误等）                        | 提示账号或密码错误                         |
+| 403    | 禁止访问（权限不足，如非作者编辑他人文章）    | 提示权限不足                               |
+| 404    | 资源不存在                                    | 提示资源不存在                             |
+| 500    | 服务器内部错误（兜底，不暴露堆栈）            | 提示稍后重试                               |
 
 > **HTTP 状态映射**：`GlobalExceptionHandler` 将业务码映射为 HTTP 状态码——标准 HTTP 状态（100-599）原样使用，否则取业务码前三位（`401004 → 401`）。完整业务码仍保留在响应体 `Result.code` 中，供前端精确区分。
 
@@ -308,9 +308,7 @@ GET /posts?categoryId=1&tagId=1&keyword=vue
         "id": 1,
         "name": "技术"
       },
-      "tags": [
-        { "id": 1, "name": "Vue", "createdAt": "2024-01-01T00:00:00Z" }
-      ],
+      "tags": [{ "id": 1, "name": "Vue", "createdAt": "2024-01-01T00:00:00Z" }],
       "authorNickname": "张三",
       "authorAvatar": "https://example.com/avatar.jpg"
     }
@@ -415,7 +413,7 @@ Content-Type: application/json
   "categoryId": 1 (分类ID，可选),
   "tags": [1, 2] (标签ID数组，至少 1 个，最多 5 个),
   "readingTime": 15 (预估阅读时间（分钟），可选),
-  "status": 0 (0=草稿, 1=已发布(审核通过), 2=待审核，可选，默认1),
+  "status": 0 (0=草稿, 1=已发布(审核通过), 2=待审核，可选，默认2),
   "allowComment": true (是否允许评论，可选，默认true)
 }
 ```
@@ -1190,8 +1188,8 @@ GET /categories?keyword=技术
 
 **Query 参数**
 
-| 参数    | 类型   | 必填 | 默认值 | 说明                                |
-| ------- | ------ | :--: | ------ | ----------------------------------- |
+| 参数    | 类型   | 必填 | 默认值 | 说明                               |
+| ------- | ------ | :--: | ------ | ---------------------------------- |
 | keyword | string |  否  | -      | 分类名搜索关键词（模糊匹配），可选 |
 
 **返回**
@@ -1232,10 +1230,10 @@ GET /categories/page?page=1&pageSize=10&keyword=技术
 
 **Query 参数**
 
-| 参数     | 类型   | 必填 | 默认值 | 说明                        |
-| -------- | ------ | :--: | ------ | --------------------------- |
-| page     | number |  否  | 1      | 页码，从 1 开始             |
-| pageSize | number |  否  | 10     | 每页条数                    |
+| 参数     | 类型   | 必填 | 默认值 | 说明                         |
+| -------- | ------ | :--: | ------ | ---------------------------- |
+| page     | number |  否  | 1      | 页码，从 1 开始              |
+| pageSize | number |  否  | 10     | 每页条数                     |
 | keyword  | string |  否  | -      | 分类名搜索关键词（模糊匹配） |
 
 **返回**
@@ -1422,6 +1420,7 @@ Content-Type: application/json
 **备注**
 
 - 需要认证（登录）
+- 前端「写文章」页下拉开启 `allow-create`：用户输入的新标签名会先调用本接口创建、拿到 `id` 后再放入 `POST /posts` 的 `tags` 数组（`POST /posts` 只接受标签 ID，不接受名称），否则新标签会被静默丢弃、文章带上 0 个标签
 
 ---
 
@@ -1440,8 +1439,8 @@ GET /tags?keyword=Vue
 
 **Query 参数**
 
-| 参数    | 类型   | 必填 | 默认值 | 说明                              |
-| ------- | ------ | :--: | ------ | --------------------------------- |
+| 参数    | 类型   | 必填 | 默认值 | 说明                               |
+| ------- | ------ | :--: | ------ | ---------------------------------- |
 | keyword | string |  否  | -      | 标签名搜索关键词（模糊匹配），可选 |
 
 **返回**
@@ -1471,6 +1470,7 @@ GET /tags?keyword=Vue
 
 - 不需要认证
 - 供标签下拉选择器使用；支持可选 `keyword` 过滤
+- 前端调用方：首页标签筛选（`Home.vue`）、写文章页标签下拉（`WriteArticle.vue`，进页面即拉取，传 `force=true` 保证选项最新）、后台标签管理
 
 #### 2.2 分页获取标签
 
@@ -1482,11 +1482,11 @@ GET /tags/page?page=1&pageSize=10&keyword=Vue
 
 **Query 参数**
 
-| 参数     | 类型   | 必填 | 默认值 | 说明                           |
-| -------- | ------ | :--: | ------ | ------------------------------ |
-| page     | number |  否  | 1      | 页码，从 1 开始                |
-| pageSize | number |  否  | 10     | 每页条数                       |
-| keyword  | string |  否  | -      | 标签名搜索关键词（模糊匹配）   |
+| 参数     | 类型   | 必填 | 默认值 | 说明                         |
+| -------- | ------ | :--: | ------ | ---------------------------- |
+| page     | number |  否  | 1      | 页码，从 1 开始              |
+| pageSize | number |  否  | 10     | 每页条数                     |
+| keyword  | string |  否  | -      | 标签名搜索关键词（模糊匹配） |
 
 **返回**
 
@@ -1946,8 +1946,8 @@ async function createArticle() {
       contentMd: "# 文章内容（Markdown）",
       summary: "可选摘要",
       categoryId: 1,
-      tags: [1, 2],          // 标签 ID 数组，标签需预先存在
-      status: 2,             // 2=提交审核
+      tags: [1, 2], // 标签 ID 数组，标签需预先存在
+      status: 2, // 2=提交审核
       allowComment: true,
     });
     console.log("文章创建成功:", response);
@@ -2392,10 +2392,10 @@ CREATE TABLE blog_ai_messages (
 
 文档与前端统一用 **`article` / `articleId`** 作为对外命名，而后端实体/表用 **`post` / `post_id`**。映射关系：
 
-| 前端/文档字段 | 后端实体字段 | DB 列 |
-| --- | --- | --- |
+| 前端/文档字段                    | 后端实体字段         | DB 列                   |
+| -------------------------------- | -------------------- | ----------------------- |
 | `articleId`（Comment.articleId） | `BlogComment.postId` | `blog_comments.post_id` |
-| `articleId`（路径参数） | `BlogPost.id` | `blog_posts.id` |
+| `articleId`（路径参数）          | `BlogPost.id`        | `blog_posts.id`         |
 
 **对齐方式**：后端在 VO/DTO 层做映射（`postId`→`articleId`），或前端兼容 `postId`。推荐前者，保持对外 API 命名稳定。
 
@@ -2403,26 +2403,26 @@ CREATE TABLE blog_ai_messages (
 
 `blog_posts` 实体**没有**以下列，但前端 `Article` / `ArticleListItem` 类型需要，必须在 VO 层派生：
 
-| 前端字段 | 来源 |
-| --- | --- |
-| `commentCount` | 聚合 `blog_comments` 中 `post_id` 对应、`status=1` 的评论数 |
-| `publishedAt` | `status=1` 时取 `updated_at`（或首次转 1 的时间），否则 `null` |
-| `liked` / `favorited` | 查 `blog_post_likes` / `blog_post_favorites` 当前用户/IP 是否存在记录 |
-| `authorNickname` / `authorAvatar` | 关联 `blog_users.nickname` / `blog_users.avatar` |
-| `category` | 关联 `blog_categories`（仅 id+name） |
-| `tags` | 关联 `blog_post_tags` + `blog_tags` |
+| 前端字段                          | 来源                                                                  |
+| --------------------------------- | --------------------------------------------------------------------- |
+| `commentCount`                    | 聚合 `blog_comments` 中 `post_id` 对应、`status=1` 的评论数           |
+| `publishedAt`                     | `status=1` 时取 `updated_at`（或首次转 1 的时间），否则 `null`        |
+| `liked` / `favorited`             | 查 `blog_post_likes` / `blog_post_favorites` 当前用户/IP 是否存在记录 |
+| `authorNickname` / `authorAvatar` | 关联 `blog_users.nickname` / `blog_users.avatar`                      |
+| `category`                        | 关联 `blog_categories`（仅 id+name）                                  |
+| `tags`                            | 关联 `blog_post_tags` + `blog_tags`                                   |
 
 > 当前 `BlogPostController` 直接返回 `BlogPost` 实体，**不含**上述派生字段。需新增 `PostVO` 封装后再返回。
 
 ### 3. 类型映射：`boolean` ↔ `TINYINT(1)`
 
-| 前端类型（boolean） | DB 列（TINYINT(1)） |
-| --- | --- |
-| `allowComment` | `blog_posts.allow_comment` |
-| `isTop` | `blog_posts.is_top` |
-| `isAdmin`（Comment） | `blog_comments.is_admin` |
-| `liked` / `favorited`（Article） | 派生，见上 |
-| `revoked`（后端 RefreshToken） | `blog_refresh_tokens.revoked` |
+| 前端类型（boolean）              | DB 列（TINYINT(1)）           |
+| -------------------------------- | ----------------------------- |
+| `allowComment`                   | `blog_posts.allow_comment`    |
+| `isTop`                          | `blog_posts.is_top`           |
+| `isAdmin`（Comment）             | `blog_comments.is_admin`      |
+| `liked` / `favorited`（Article） | 派生，见上                    |
+| `revoked`（后端 RefreshToken）   | `blog_refresh_tokens.revoked` |
 
 JPA 默认 `Boolean` ↔ `TINYINT(1)`；前端需确保收到 `0/1` 时按布尔处理（`client.ts` 不自动转换，建议后端用 `@TableField`/VO 显式输出 `boolean`）。
 
@@ -2437,39 +2437,39 @@ JPA 默认 `Boolean` ↔ `TINYINT(1)`；前端需确保收到 `0/1` 时按布尔
 
 **BlogPostController（`/api/posts`）现状 vs 文档：**
 
-| 文档路径 | 后端现状 | 差异说明 |
-| --- | --- | --- |
-| `GET /posts?categoryId&tagId&keyword`（列表） | `GET /posts/published`、`GET /posts/category/{categoryId}`、`GET /posts/search?keyword` | 后端拆成多接口、**不支持组合筛选与分页**；前端 `getArticles` 期望单接口不分页返回全量 |
-| `GET /posts/{id}`（详情含 category/tags/liked 等） | `GET /posts/{id}` 返回裸 `BlogPost` | 缺派生字段（见 §2）；**浏览量非自动+1**，需单独 `PUT /posts/{id}/view` |
-| `POST /posts`（入参含 `tags:number[]`） | `POST /posts` 入参是裸 `BlogPost` | **入参无 `tags` 字段**，标签需另存 `blog_post_tags`；`status` 默认 `@PrePersist` 置 1（绕过审核） |
-| `PUT /posts/{id}/approve` | `PUT /posts/{id}/publish` | 路径不同；且**无 `/reject` 接口** |
-| `GET /posts/pending`（待审核分页） | 无 | 未实现 |
-| `POST/DELETE /posts/{id}/like`、收藏接口 | 无 | 未实现控制器 |
+| 文档路径                                           | 后端现状                                                                                | 差异说明                                                                                          |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `GET /posts?categoryId&tagId&keyword`（列表）      | `GET /posts/published`、`GET /posts/category/{categoryId}`、`GET /posts/search?keyword` | 后端拆成多接口、**不支持组合筛选与分页**；前端 `getArticles` 期望单接口不分页返回全量             |
+| `GET /posts/{id}`（详情含 category/tags/liked 等） | `GET /posts/{id}` 返回裸 `BlogPost`                                                     | 缺派生字段（见 §2）；**浏览量非自动+1**，需单独 `PUT /posts/{id}/view`                            |
+| `POST /posts`（入参含 `tags:number[]`）            | `POST /posts` 入参是裸 `BlogPost`                                                       | **入参无 `tags` 字段**，标签需另存 `blog_post_tags`；`status` 默认 `@PrePersist` 置 1（绕过审核） |
+| `PUT /posts/{id}/approve`                          | `PUT /posts/{id}/publish`                                                               | 路径不同；且**无 `/reject` 接口**                                                                 |
+| `GET /posts/pending`（待审核分页）                 | 无                                                                                      | 未实现                                                                                            |
+| `POST/DELETE /posts/{id}/like`、收藏接口           | 无                                                                                      | 未实现控制器                                                                                      |
 
 **BlogUserController（`/api/auth`）现状 vs 文档：**
 
-| 文档路径 | 后端现状 | 差异说明 |
-| --- | --- | --- |
-| `POST /auth/refresh` 返回 `{accessToken, user}` | 仅返回 `{accessToken}` | 文档已对齐为只返回 `accessToken`；前端刷新分支不应依赖 `user` |
-| `POST /auth/logout` 返回 `data:null` | 返回 `data:"退出登录成功"`（字符串） | 文档已对齐 |
+| 文档路径                                                                    | 后端现状                                                                 | 差异说明                                                                                    |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `POST /auth/refresh` 返回 `{accessToken, user}`                             | 仅返回 `{accessToken}`                                                   | 文档已对齐为只返回 `accessToken`；前端刷新分支不应依赖 `user`                               |
+| `POST /auth/logout` 返回 `data:null`                                        | 返回 `data:"退出登录成功"`（字符串）                                     | 文档已对齐                                                                                  |
 | `GET/PUT /auth/me` 返回 `User`（含 status/lastLoginAt/createdAt/updatedAt） | `UserVO` 仅含 id/username/nickname/email/avatar/bio/website/github/weibo | **`UserVO` 缺 status/lastLoginAt/createdAt/updatedAt**，前端 `User` 类型需要，后端需扩展 VO |
-| `POST /auth/register` 入参含 avatar/nickname | `RegisterDTO` 仅 username/password/email | 后端不支持注册时传 avatar/nickname |
+| `POST /auth/register` 入参含 avatar/nickname                                | `RegisterDTO` 仅 username/password/email                                 | 后端不支持注册时传 avatar/nickname                                                          |
 
 **BlogTagController（`/api/tags`）现状 vs 文档：**
 
-| 文档路径 | 后端现状 | 差异说明 |
-| --- | --- | --- |
-| `DELETE /tags/{id}` | `@DeleteMapping("/{id}")`（已修复） | 原路径重复 bug（双重 `tags`）**已修复**，现实际路径为 `/api/tags/{id}` |
+| 文档路径                        | 后端现状                                                                                     | 差异说明                                                                                                                                       |
+| ------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DELETE /tags/{id}`             | `@DeleteMapping("/{id}")`（已修复）                                                          | 原路径重复 bug（双重 `tags`）**已修复**，现实际路径为 `/api/tags/{id}`                                                                         |
 | `GET /tags` 返回 `Tag[]` 或分页 | 已拆为 `GET /tags`→`Result<List<BlogTag>>` + `GET /tags/page`→`Result<PageResult>`（已修复） | 原 `Result<Object>` 分支返回不稳定，**已修复**：全量接口固定返回数组，分页接口固定返回 `PageResult`。前端 `getTagsPaged` URL 已改 `/tags/page` |
-| `PUT /tags/{id}` 返回 `Tag` | 返回 `TagResponse{id:int, name:String, createdAt:String}` | `createdAt` 为 `String` 而非日期类型，且**无 id 之外的创建时间精度保证** |
+| `PUT /tags/{id}` 返回 `Tag`     | 返回 `TagResponse{id:int, name:String, createdAt:String}`                                    | `createdAt` 为 `String` 而非日期类型，且**无 id 之外的创建时间精度保证**                                                                       |
 
 **BlogCategoryController（`/api/categories`）现状 vs 文档：**
 
-| 文档路径 | 后端现状 | 差异说明 |
-| --- | --- | --- |
-| `GET /categories` 返回 `Category[]` 或分页 | 已拆为 `GET /categories`→`Result<List<BlogCategory>>` + `GET /categories/page`→`Result<PageResult>`（已修复） | 与标签同步修复：原 `Result<Object>` 分支返回不稳定，**已修复**。前端 `getCategoriesPaged` URL 已改 `/categories/page` |
-| 分类层级（`parentId` / `parent_id`） | **已移除**：`BlogCategory`、`CategoryDTO` 不再含 `parentId`；`findByParentId`、`getTopCategories`、`getSubCategories`、`GET /top`、`GET /sub/{parentId}` 全部删除 | 分类改为扁平结构，每个分类都是独立的一级分类，与标签定位一致；前端 `AdminCategories` 的「父分类」选择器同步删除 |
-| 删除分类的子分类校验 | 已移除：`DELETE /categories/{id}` 不再检查 `parentId === id` | 无层级后不存在子分类，删除即删；mock 层同步删除该校验 |
+| 文档路径                                   | 后端现状                                                                                                                                                          | 差异说明                                                                                                              |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `GET /categories` 返回 `Category[]` 或分页 | 已拆为 `GET /categories`→`Result<List<BlogCategory>>` + `GET /categories/page`→`Result<PageResult>`（已修复）                                                     | 与标签同步修复：原 `Result<Object>` 分支返回不稳定，**已修复**。前端 `getCategoriesPaged` URL 已改 `/categories/page` |
+| 分类层级（`parentId` / `parent_id`）       | **已移除**：`BlogCategory`、`CategoryDTO` 不再含 `parentId`；`findByParentId`、`getTopCategories`、`getSubCategories`、`GET /top`、`GET /sub/{parentId}` 全部删除 | 分类改为扁平结构，每个分类都是独立的一级分类，与标签定位一致；前端 `AdminCategories` 的「父分类」选择器同步删除       |
+| 删除分类的子分类校验                       | 已移除：`DELETE /categories/{id}` 不再检查 `parentId === id`                                                                                                      | 无层级后不存在子分类，删除即删；mock 层同步删除该校验                                                                 |
 
 ### 6. 缺失的控制器（文档有、后端无）
 

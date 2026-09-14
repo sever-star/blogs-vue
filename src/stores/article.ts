@@ -129,8 +129,9 @@ export const useArticleStore = defineStore('article', () => {
 
   // ========== 方法 ==========
 
-  /** 获取标签列表 */
-  const fetchTags = async () => {
+  /** 获取标签列表（已加载则跳过；force=true 强制刷新，用于写作/编辑页保证选项最新） */
+  const fetchTags = async (force = false) => {
+    if (tags.value.length > 0 && !force) return
     try {
       tags.value = await getTagsApi()
     } catch (error) {
