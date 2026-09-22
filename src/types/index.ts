@@ -59,7 +59,6 @@ export interface ArticleListItem {
   status: number
   allowComment: boolean
   isTop: boolean
-  publishedAt: string | null
   createdAt: string
   updatedAt: string
   category?: Category

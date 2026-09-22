@@ -83,7 +83,6 @@ export const useArticleStore = defineStore('article', () => {
       status: index < 3 ? 2 : 1, // 前 3 篇模拟为「待审核」
       allowComment: true,
       isTop: index >= 3 && index < 5, // 待审核文章不置顶，置顶顺延
-      publishedAt: index < 3 ? null : new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
       createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
       updatedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
       category: mockCategories[item.categoryIndex],
@@ -99,7 +98,7 @@ export const useArticleStore = defineStore('article', () => {
 
   const filteredArticles = computed(() => {
     // 首页只展示已发布(status=1)文章；草稿/待审核走管理端
-    let list = allArticles.value.filter(a => a.status === 1)
+    let list = articles.value.filter(a => a.status === 1)
     if (selectedCategory.value) {
       list = list.filter(article => article.category?.id === selectedCategory.value)
     }
@@ -143,9 +142,8 @@ export const useArticleStore = defineStore('article', () => {
   const fetchArticles = async (page: number = 1, tagId?: number | null, categoryId?: number | null, params?: ArticleQueryParams) => {
     loading.value = true
     try {
-      // TODO: 接入真实 API: GET /posts（不分页，返回全量数组）
-      // articles.value = await getArticlesApi({ categoryId: categoryId ?? undefined, tagId: tagId ?? undefined, ...params })
-      // totalCount.value = articles.value.length
+      // 接入真实 API: GET /posts（不分页，返回全量数组；筛选仍在 filteredArticles 客户端进行）
+      articles.value = await getArticlesApi({ categoryId: categoryId ?? undefined, tagId: tagId ?? undefined, ...params })
 
       currentPage.value = page
       if (categoryId !== undefined) {
@@ -206,7 +204,6 @@ export const useArticleStore = defineStore('article', () => {
       const pending = allArticles.value.find(a => a.id === id)
       if (pending) {
         pending.status = 1
-        pending.publishedAt = new Date().toISOString()
       }
       pendingArticles.value = pendingArticles.value.filter(a => a.id !== id)
     } catch (error) {
@@ -233,25 +230,8 @@ export const useArticleStore = defineStore('article', () => {
   const fetchArticleById = async (id: number) => {
     loading.value = true
     try {
-      // TODO: 接入真实 API: GET /posts/{id}
-      // currentArticle.value = await getArticleByIdApi(id)
-
-      const listItem = allArticles.value.find(a => a.id === id)
-      if (listItem) {
-        currentArticle.value = {
-          ...listItem,
-          contentMd: `# ${listItem.title}\n\n这是一篇关于 ${listItem.title} 的详细文章。\n\n## 章节1\n\n内容详情...\n\n## 章节2\n\n更多内容...`,
-          contentHtml: `<h1>${listItem.title}</h1><p>这是一篇关于 ${listItem.title} 的详细文章。</p>`,
-          liked: false,
-          favorited: false,
-          viewCount: listItem.viewCount + 1,
-        }
-        // 更新全局数据中的浏览数
-        const idx = allArticles.value.findIndex(a => a.id === id)
-        if (idx > -1) {
-          allArticles.value[idx].viewCount += 1
-        }
-      }
+      // 接入真实 API: GET /posts/{id}（浏览量 viewCount 由后端自动 +1，前端不再本地累加）
+      currentArticle.value = await getArticleByIdApi(id)
     } catch (error) {
       console.error('获取文章详情失败:', error)
     } finally {
@@ -286,8 +266,6 @@ export const useArticleStore = defineStore('article', () => {
         status: payload.status ?? 1,
         allowComment: payload.allowComment ?? true,
         isTop: false,
-        // 仅 status=1（已发布/审核通过）才设置发布时间；草稿/待审核不显示在首页
-        publishedAt: payload.status === 1 ? new Date().toISOString() : null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         tags: tagObjs,
@@ -304,24 +282,23 @@ export const useArticleStore = defineStore('article', () => {
     }
   }
 
-  /** 更新文章 */
-  const updateArticle = async (id: number, payload: Partial<ArticlePayload>) => {
+  /** 更新文章（接入真实 API: PUT /posts/{id}） */
+  const updateArticle = async (id: number, payload: Partial<ArticlePayload>): Promise<Article | null> => {
     try {
-      // TODO: 接入真实 API: PUT /posts/{id}
-      // return await updateArticleApi(id, payload)
-
-      const index = allArticles.value.findIndex(a => a.id === id)
-      if (index > -1) {
-        allArticles.value[index] = {
-          ...allArticles.value[index],
-          ...(payload.title && { title: payload.title }),
-          ...(payload.summary && { summary: payload.summary }),
-          ...(payload.coverImage !== undefined && { coverImage: payload.coverImage }),
-          updatedAt: new Date().toISOString(),
-        }
+      const updated = await updateArticleApi(id, payload)
+      // 同步列表缓存（若存在）
+      const listIdx = articles.value.findIndex(a => a.id === id)
+      if (listIdx > -1) {
+        articles.value[listIdx] = { ...articles.value[listIdx], ...updated }
       }
+      // 同步当前详情缓存（若正在查看同一篇）
+      if (currentArticle.value?.id === id) {
+        currentArticle.value = { ...currentArticle.value, ...updated }
+      }
+      return updated
     } catch (error) {
       console.error('更新文章失败:', error)
+      throw error
     }
   }
 
@@ -385,7 +362,7 @@ export const useArticleStore = defineStore('article', () => {
   }
 
   return {
-    articles: allArticles,
+    articles,
     tags,
     categories,
     selectedTag,

@@ -1,7 +1,7 @@
 <template>
   <main class="write-article">
     <div class="write-container">
-      <h1 class="page-title">写文章</h1>
+      <h1 class="page-title">{{ isEdit ? '编辑文章' : '写文章' }}</h1>
 
       <el-card class="editor-card">
         <template #header>
@@ -13,7 +13,7 @@
           </div>
         </template>
 
-        <el-form :model="formData" label-width="100px" @submit.prevent="handlePublish">
+        <el-form :model="formData" label-width="100px" @submit.prevent="handleSubmit">
           <!-- 文章标题 -->
           <el-form-item label="文章标题" required>
             <el-input
@@ -80,10 +80,10 @@
             <el-button
               v-if="authStore.isLoggedIn"
               type="primary"
-              @click="handlePublish"
+              @click="handleSubmit"
               :loading="publishing"
             >
-              提交审核
+              {{ isEdit ? '保存修改' : '提交审核' }}
             </el-button>
             <el-button @click="handleReset">重置</el-button>
             <el-button @click="handleCancel">取消</el-button>
@@ -96,7 +96,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useArticleStore } from '@/stores/article'
 import { useAuthStore } from '@/stores/auth'
 import { useCategoryStore } from '@/stores/category'
@@ -110,10 +110,13 @@ const MDEditorMermaid = undefined
 const MDEditorCodeTheme = undefined
 
 const router = useRouter()
+const route = useRoute()
 const articleStore = useArticleStore()
 const authStore = useAuthStore()
 const categoryStore = useCategoryStore()
 
+const isEdit = computed(() => !!route.params.id)
+const editId = computed(() => Number(route.params.id))
 const focusedField = ref('')
 const publishing = ref(false)
 
@@ -137,6 +140,7 @@ onMounted(() => {
   // 加载分类与标签列表（标签下拉的数据源）
   categoryStore.fetchCategories()
   articleStore.fetchTags(true)
+  loadArticleForEdit()
 })
 
 function validateForm(): boolean {
@@ -196,7 +200,31 @@ async function resolveTagIds(names: string[]): Promise<number[]> {
   return [...new Set(ids)]
 }
 
-async function handlePublish() {
+/** 编辑模式：加载文章并预填表单 */
+async function loadArticleForEdit() {
+  if (!isEdit.value) return
+  const article = articleStore.currentArticle?.id === editId.value
+    ? articleStore.currentArticle
+    : await articleStore.fetchArticleById(editId.value)
+
+  if (!article || article.id !== editId.value) {
+    ElMessage.error('文章不存在')
+    router.replace('/')
+    return
+  }
+  // 仅作者本人可编辑（后端 PUT /posts/{id} 也会校验）
+  if (authStore.user?.id && article.userId !== authStore.user.id) {
+    ElMessage.error('只能编辑自己的文章')
+    router.replace(`/article/${editId.value}`)
+    return
+  }
+  formData.value.title = article.title
+  formData.value.categoryId = article.category?.id
+  formData.value.tags = article.tags.map((t) => t.name)
+  formData.value.content = article.contentMd
+}
+
+async function handleSubmit() {
   if (!authStore.isLoggedIn) {
     ElMessage.warning('请先登录')
     authStore.openLoginModal()
@@ -214,6 +242,20 @@ async function handlePublish() {
       ElMessage.error('标签处理失败，请重试')
       return
     }
+
+    if (isEdit.value) {
+      await articleStore.updateArticle(editId.value, {
+        title: formData.value.title,
+        contentMd: formData.value.content,
+        categoryId: formData.value.categoryId,
+        tags: selectedTagIds,
+        status: 2, // 修改后重新提交审核
+      })
+      ElMessage.success('修改已保存，等待重新审核')
+      router.push(`/article/${editId.value}`)
+      return
+    }
+
     await articleStore.createArticle({
       title: formData.value.title,
       contentMd: formData.value.content,
@@ -224,14 +266,14 @@ async function handlePublish() {
 
     ElMessage.success('已提交审核，等待管理员审核')
     handleReset()
-    
+
     // 返回首页
     setTimeout(() => {
       router.push('/')
     }, 500)
   } catch (error) {
-    ElMessage.error('发布失败，请重试')
-    console.error('发布失败:', error)
+    ElMessage.error(isEdit.value ? '保存失败，请重试' : '发布失败，请重试')
+    console.error('提交失败:', error)
   } finally {
     publishing.value = false
   }

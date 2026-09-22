@@ -134,7 +134,6 @@ const makeArticleListItems = (): ArticleListItem[] =>
     status: 1,
     allowComment: true,
     isTop: i < 2,
-    publishedAt: new Date(Date.now() - Math.random() * 30 * 86400000).toISOString(),
     createdAt: new Date(Date.now() - Math.random() * 30 * 86400000).toISOString(),
     updatedAt: new Date(Date.now() - Math.random() * 30 * 86400000).toISOString(),
     tags: def.tagIds.map(tid => mockTags.find(t => t.id === tid)!),
@@ -147,7 +146,6 @@ const mockArticles: ArticleListItem[] = makeArticleListItems()
 // 模拟待审核文章：把前 3 篇标记为 status=2（待审核），供审核页展示
 mockArticles.slice(0, 3).forEach(a => {
   a.status = 2
-  a.publishedAt = null
 })
 
 // 评论缓存（key: articleId）
@@ -487,7 +485,6 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     if (!a) return err(404, '文章不存在')
     if (a.status !== 2) return err(400, '该文章不在待审核状态')
     a.status = 1
-    a.publishedAt = new Date().toISOString()
     return ok(a)
   },
 
@@ -526,7 +523,7 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
       summary: data?.summary || '', coverImage: data?.coverImage || '',
       readingTime: data?.readingTime || 0, viewCount: 0, likeCount: 0, favCount: 0, commentCount: 0,
       status: data?.status ?? 1, allowComment: data?.allowComment ?? true, isTop: false,
-      publishedAt: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       tags: tagObjs, authorNickname: '博主小明',
       authorAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
       liked: false, favorited: false,

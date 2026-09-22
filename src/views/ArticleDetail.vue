@@ -23,12 +23,21 @@
       <article v-else>
         <!-- 文章头部 -->
         <header class="article-header">
-          <h1 class="article-title">{{ articleStore.currentArticle.title }}</h1>
+          <div class="title-row">
+            <h1 class="article-title">{{ articleStore.currentArticle.title }}</h1>
+            <el-button v-if="isAuthor" type="primary" plain size="small" class="edit-btn" @click="handleEdit">
+              <el-icon><Edit /></el-icon>
+              编辑文章
+            </el-button>
+          </div>
 
           <div class="article-info">
             <span class="author">
               <el-icon><User /></el-icon>
               {{ articleStore.currentArticle.authorNickname }}
+              <el-tag v-if="isAuthor" type="primary" size="small" effect="light" class="author-badge">
+                我的文章
+              </el-tag>
             </span>
             <span class="publish-time">
               <el-icon><Calendar /></el-icon>
@@ -86,17 +95,26 @@
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useArticleStore } from '@/stores/article'
+import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 import { MdPreview as MDPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
-import { Star, ChatDotRound, User, Calendar, View, ArrowLeft } from '@element-plus/icons-vue'
+import { Star, ChatDotRound, User, Calendar, View, ArrowLeft, Edit } from '@element-plus/icons-vue'
 import CommentSection from '@/components/CommentSection.vue'
 
 const route = useRoute()
 const router = useRouter()
 const articleStore = useArticleStore()
+const authStore = useAuthStore()
 
 const articleId = computed(() => parseInt(route.params.id as string))
+
+// 是否为当前登录用户自己的文章（用于展示身份标识与快捷编辑入口）
+const isAuthor = computed(
+  () =>
+    !!authStore.user?.id &&
+    articleStore.currentArticle?.userId === authStore.user.id
+)
 
 onMounted(async () => {
   try {
@@ -109,6 +127,10 @@ onMounted(async () => {
 
 function handleLike() {
   ElMessage.success('已点赞')
+}
+
+function handleEdit() {
+  router.push(`/write/${articleId.value}`)
 }
 
 function handleBack() {
@@ -172,6 +194,21 @@ article {
   font-weight: 700;
   color: #1f2937;
   line-height: 1.4;
+}
+
+.title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.edit-btn {
+  flex-shrink: 0;
+}
+
+.author-badge {
+  margin-left: 2px;
 }
 
 .article-info {

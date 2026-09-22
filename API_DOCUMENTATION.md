@@ -301,7 +301,6 @@ GET /posts?categoryId=1&tagId=1&keyword=vue
       "status": 1,
       "allowComment": true,
       "isTop": false,
-      "publishedAt": "2024-01-15T10:00:00Z",
       "createdAt": "2024-01-15T10:00:00Z",
       "updatedAt": "2024-01-20T14:30:00Z",
       "category": {
@@ -320,7 +319,7 @@ GET /posts?categoryId=1&tagId=1&keyword=vue
 
 - 不需要认证即可访问
 - 返回已发布的文章（status=1）
-- 按 `publishedAt` 倒序排列
+- 按 `createdAt` 倒序排列
 - 列表接口不返回 `contentMd` 和 `contentHtml` 完整内容，仅返回 `summary`
 - 不支持分页（首页文章列表）；管理端文章审核列表的分页见 `GET /posts/pending`
 
@@ -361,7 +360,6 @@ GET /posts/{id}
     "status": 1,
     "allowComment": true,
     "isTop": false,
-    "publishedAt": "2024-01-15T10:00:00Z",
     "createdAt": "2024-01-15T10:00:00Z",
     "updatedAt": "2024-01-20T14:30:00Z",
     "category": {
@@ -440,7 +438,6 @@ Content-Type: application/json
     "status": 1,
     "allowComment": true,
     "isTop": false,
-    "publishedAt": "2024-01-20T14:30:00Z",
     "createdAt": "2024-01-20T14:30:00Z",
     "updatedAt": "2024-01-20T14:30:00Z",
     "category": {
@@ -463,7 +460,6 @@ Content-Type: application/json
 - 需要认证（登录）
 - `summary` 不填时自动从 `contentMd` 截取前 150 个字符（去除 Markdown 标记）
 - `tags` 传标签 ID 数组，标签需预先存在于 `tags` 表中
-- `publishedAt` 在 status=1 时自动设为当前时间
 
 ---
 
@@ -628,13 +624,12 @@ Authorization: Bearer {accessToken}
   "data": {
     "id": 52,
     "status": 1,
-    "publishedAt": "2024-01-21T09:00:00Z",
     "...": "其余 Article 字段（title/summary/likeCount/viewCount 等）"
   }
 }
 ```
 
-> **字段映射**：`blog_posts` 实体**没有 `published_at` 列**，也无 `comment_count`。`publishedAt` 应在 VO 层派生——`status=1` 时取 `updated_at`（或首次转 1 的时间），否则 `null`；`commentCount` 由 `blog_comments` 聚合。详见末尾「实现差异与字段映射」。
+> **字段映射**：`blog_posts` 实体**没有 `comment_count` 列**，`commentCount` 由 `blog_comments` 聚合。详见末尾「实现差异与字段映射」。
 
 **错误情况**
 
@@ -667,7 +662,6 @@ Authorization: Bearer {accessToken}
   "data": {
     "id": 52,
     "status": 0,
-    "publishedAt": null,
     "...": "其余 Article 字段"
   }
 }
@@ -2014,7 +2008,7 @@ accessToken 过期 → 任意请求返回 401
 >
 > **类型映射**：`Integer`→`INT`/`TINYINT`，`Long`→`BIGINT`，`LocalDateTime`→`DATETIME`，`String`→`VARCHAR(n)`/`TEXT`/`LONGTEXT`/`JSON`，`Boolean`→`TINYINT(1)`。时间戳由实体 `@PrePersist`/`@PreUpdate`（手动赋值）或 `@CreatedDate`/`@LastModifiedDate`（仅 `RefreshToken`）维护，**非数据库 `DEFAULT CURRENT_TIMESTAMP`**。
 >
-> **⚠️ 重要字段差异**：API 返回的 `commentCount`（评论数）、`publishedAt`（发布时间）在 `blog_posts` 实体中**并不存在对应列**，需后端在 VO 层计算/派生（详见文末「实现差异与字段映射」）。
+> **⚠️ 重要字段差异**：API 返回的 `commentCount`（评论数）在 `blog_posts` 实体中**并不存在对应列**，需后端在 VO 层计算/派生（详见文末「实现差异与字段映射」）。
 
 ### 一、核心内容表
 
@@ -2064,7 +2058,7 @@ CREATE TABLE blog_posts (
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL,
   deleted_at DATETIME DEFAULT NULL COMMENT '软删除时间'
-  -- 注意：无 comment_count、无 published_at 列（API 需派生，见文末）
+  -- 注意：无 comment_count 列（API 需派生，见文末）
   -- 注意：无 user_id/category_id 外键与索引（设计缺陷，见文末）
 );
 ```
@@ -2406,7 +2400,6 @@ CREATE TABLE blog_ai_messages (
 | 前端字段                          | 来源                                                                  |
 | --------------------------------- | --------------------------------------------------------------------- |
 | `commentCount`                    | 聚合 `blog_comments` 中 `post_id` 对应、`status=1` 的评论数           |
-| `publishedAt`                     | `status=1` 时取 `updated_at`（或首次转 1 的时间），否则 `null`        |
 | `liked` / `favorited`             | 查 `blog_post_likes` / `blog_post_favorites` 当前用户/IP 是否存在记录 |
 | `authorNickname` / `authorAvatar` | 关联 `blog_users.nickname` / `blog_users.avatar`                      |
 | `category`                        | 关联 `blog_categories`（仅 id+name）                                  |
