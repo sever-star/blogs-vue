@@ -10,7 +10,7 @@ import {
   removeAccessToken,
 } from '@/utils/token'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:8081/api')
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:8081/api')
 
 const client: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,

@@ -13,7 +13,10 @@
       <nav class="nav-section">
         <!-- Links for all users -->
         <router-link to="/" class="nav-link">首页</router-link>
-        
+
+        <!-- AI assistant link (open to guests as well) -->
+        <router-link to="/ai" class="nav-link">AI 助手</router-link>
+
         <!-- Write article link (only when logged in) -->
         <router-link
           v-if="isLoggedIn"

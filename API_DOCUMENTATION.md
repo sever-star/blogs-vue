@@ -1839,6 +1839,271 @@ Content-Type: multipart/form-data
 
 ---
 
+## AI 助手接口
+
+AI 对话模块采用「后端代理」模式：前端不直连大模型，而是把提问发给后端，由后端组装上下文、调用 DeepSeek（OpenAI 兼容协议）并以 SSE 流式转发结果。模块**对游客开放**——会话按客户端 IP 归属（登录用户按 user_id 归属），因此无需认证，成本控制靠后端按 IP 的限流实现。
+
+> 本模块接口路径同样省略 `/api` 前缀（前端 axios baseURL 自动补全），与全文档保持一致。
+
+### 1. 查询 AI 能力状态
+
+**请求**
+
+```
+GET /ai/config
+```
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "configured": false,
+    "model": "deepseek-chat"
+  }
+}
+```
+
+**备注**
+
+- 无需认证
+- `configured` 为 `false` 表示后端未配置模型 API Key，此时提问会失败；前端据此在页面上给出「AI 服务未配置」的提示，而不是等用户发出提问才报错
+
+### 2. 会话列表
+
+**请求**
+
+```
+GET /ai/sessions
+```
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": [
+    {
+      "id": 1,
+      "title": "JWT 双 token 的原理",
+      "createdAt": "2026-09-23T10:00:00",
+      "updatedAt": "2026-09-23T10:05:00"
+    }
+  ]
+}
+```
+
+**备注**
+
+- 无需认证；登录态由后端从 `Authorization` 头宽松解析，缺失或无效均按游客处理
+- 登录用户返回自己（`user_id` 匹配）的会话，游客返回本 IP 下未绑定用户的会话；两者取并集，游客登录后可接着原会话继续
+- 按 `updated_at` 倒序（最近活跃在前），最多 100 条
+
+### 3. 新建会话
+
+**请求**
+
+```
+POST /ai/sessions
+Content-Type: application/json
+```
+
+**入参**
+
+| 字段 | 类型 | 必需 | 说明 |
+|-----|------|------|------|
+| title | string | 否 | 会话标题，缺省为「新的对话」 |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "id": 2,
+    "title": "新的对话",
+    "createdAt": "2026-09-23T10:10:00",
+    "updatedAt": "2026-09-23T10:10:00"
+  }
+}
+```
+
+**备注**
+
+- 也可以不显式建会话：直接调 `POST /ai/chat` 不传 `sessionId`，后端会在首条提问时自动建会话并按提问内容命名
+
+### 4. 删除会话
+
+**请求**
+
+```
+DELETE /ai/sessions/{id}
+```
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": null
+}
+```
+
+**错误情况**
+
+- 404: 会话不存在或无权访问
+
+**备注**
+
+- 会话下的消息随 `ON DELETE CASCADE` 一并删除
+
+### 5. 会话历史消息
+
+**请求**
+
+```
+GET /ai/sessions/{id}/messages
+```
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": [
+    {
+      "id": 10,
+      "role": "user",
+      "content": "帮我解释下 SSE",
+      "tokens": 0,
+      "status": 1,
+      "createdAt": "2026-09-23T10:12:00"
+    },
+    {
+      "id": 11,
+      "role": "assistant",
+      "content": "SSE（Server-Sent Events）是……",
+      "tokens": 132,
+      "status": 1,
+      "createdAt": "2026-09-23T10:12:05"
+    }
+  ]
+}
+```
+
+**备注**
+
+- `role`：`user` 用户提问 / `assistant` AI 回复
+- `status`：`0` 生成中 / `1` 已完成 / `2` 失败（生成中断），失败的消息内容保留已生成的部分，前端据此提示重试
+- 消息按创建时间正序返回
+
+### 6. 流式对话（SSE）
+
+**请求**
+
+```
+POST /ai/chat
+Content-Type: application/json
+Accept: text/event-stream
+Authorization: Bearer {accessToken}   // 可选，登录用户带上以归属会话
+```
+
+**入参（JSON）**
+
+| 字段 | 类型 | 必需 | 说明 |
+|-----|------|------|------|
+| sessionId | number | 否 | 会话 id；为空表示新建会话 |
+| content | string | 否 | 提问正文；为空时需至少有一个附件 |
+| attachments | array | 否 | 附件列表，最多 5 个 |
+
+**attachments 数组项**
+
+| 字段 | 类型 | 必需 | 说明 |
+|-----|------|------|------|
+| name | string | 是 | 原始文件名 |
+| content | string | 否 | 文本类附件的内容（前端读成纯文本） |
+| url | string | 否 | 二进制附件的 OSS 地址 |
+
+**响应（SSE 事件流，按顺序）**
+
+```
+event:meta
+data:{"sessionId":2,"messageId":12}
+
+event:content
+data:{"delta":"SSE"}
+
+event:content
+data:{"delta":"（Server-Sent Events）是……"}
+
+event:done
+data:{"tokens":132}
+```
+
+**事件说明**
+
+| 事件 | data 字段 | 说明 |
+|-----|----------|------|
+| `meta` | sessionId, messageId | 首帧，服务端确认的会话/消息 id，前端据此挂载气泡 |
+| `content` | delta | 增量文本，会被多次推送，前端逐段渲染 |
+| `done` | tokens | 生成完成，携带本次消耗的 token 数 |
+| `error` | message | 生成中途失败（如上游限流、超时），前端展示该文案 |
+
+**错误情况（生成开始前，返回标准 JSON 错误体）**
+
+- 400: 提问与附件均为空、附件超过 5 个
+- 429: 游客超过每小时提问次数上限
+- 503: AI 服务未配置 Key、上游报错或超时
+
+**备注**
+
+- 因为 `EventSource` 只支持 GET，前端用 `fetch` + `ReadableStream` 消费本接口
+- 每条用户提问与 AI 回复都会落库到 `blog_ai_messages`，支持刷新后恢复历史
+- 文本类附件会以代码块形式拼进本轮上下文，模型能「读懂」文件内容；二进制附件只带地址，模型侧明确「无法读取内容」
+- 生成中途客户端断开时，后端停止调用上游并保留已生成内容（该条消息状态置为失败）
+
+### 7. 上传二进制附件
+
+**请求**
+
+```
+POST /ai/upload
+Content-Type: multipart/form-data
+```
+
+**入参（multipart 字段）**
+
+| 字段 | 类型 | 必需 | 说明 |
+|-----|------|------|------|
+| file | file | 是 | 附件文件，单个 ≤ 10MB |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "url": "https://{bucket}.oss-{region}.aliyuncs.com/ai-attachment/2026/09/23/uuid.png",
+    "name": "photo.png",
+    "size": 204800
+  }
+}
+```
+
+**备注**
+
+- 无需认证；用于图片等二进制附件的 OSS 中转上传
+- 文本类文件（txt/md/csv/json/代码等）不走本接口，由前端直接读成文本后放进 `attachments[].content`
+
+---
+
 ## 文章相关接口（补充）
 
 ### 9. 获取浏览量排行

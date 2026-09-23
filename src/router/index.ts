@@ -8,6 +8,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/Home.vue'),
   },
   {
+    // AI 助手对游客开放（会话按 IP 归属），因此不加 requiresAuth
+    path: '/ai',
+    name: 'AiChat',
+    component: () => import('@/views/AiChat.vue'),
+  },
+  {
     path: '/write',
     name: 'Write',
     component: () => import('@/views/WriteArticle.vue'),
