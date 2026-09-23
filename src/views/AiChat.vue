@@ -141,7 +141,7 @@
             rows="1"
             placeholder="输入你的问题，Enter 发送，Shift + Enter 换行"
             :disabled="sending"
-            @keydown.enter.exact.prevent="handleSend"
+            @keydown.enter.exact="onComposerEnter"
             @input="autoGrow"
             ref="inputRef"
           />
@@ -339,6 +339,13 @@ async function handleDeleteSession(session: AiSession) {
 }
 
 // ============ 发送与流式接收 ============
+
+/** 回车发送；中文输入法候选词确认时 isComposing 为 true，不应触发发送 */
+function onComposerEnter(event: KeyboardEvent) {
+  if (event.isComposing) return
+  event.preventDefault()
+  void handleSend()
+}
 
 async function handleSend() {
   if (!canSend.value) return
