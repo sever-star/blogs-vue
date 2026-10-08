@@ -61,6 +61,8 @@
 | 401003 | accessToken 缺失                              | 跳转到登录页                               |
 | 401004 | 认证失败（账密错误等）                        | 提示账号或密码错误                         |
 | 403    | 禁止访问（权限不足，如非作者编辑他人文章）    | 提示权限不足                               |
+| 403001 | 权限不足（非管理员访问管理接口）              | 提示无权限；前端隐藏管理入口              |
+| 403002 | 账号已被禁用                                  | 提示账号已禁用并退出登录                   |
 | 404    | 资源不存在                                    | 提示资源不存在                             |
 | 500    | 服务器内部错误（兜底，不暴露堆栈）            | 提示稍后重试                               |
 
@@ -107,6 +109,7 @@ Content-Type: application/json
       "github": "https://github.com/user1",
       "weibo": "",
       "status": 1,
+      "role": "USER",
       "lastLoginAt": "2024-01-20T10:30:00Z",
       "createdAt": "2024-01-01T00:00:00Z",
       "updatedAt": "2024-01-20T10:30:00Z"
@@ -119,6 +122,7 @@ Content-Type: application/json
 
 - 401: 用户名或密码错误
 - 400: 参数校验失败
+- 403: 账号已被禁用（业务码 403002）
 
 **备注**
 
@@ -1723,6 +1727,7 @@ Authorization: Bearer {accessToken}
     "github": "",
     "weibo": "",
     "status": 1,
+    "role": "ADMIN",
     "lastLoginAt": "2024-01-20T10:30:00Z",
     "createdAt": "2024-01-01T00:00:00Z",
     "updatedAt": "2024-01-20T10:30:00Z"
@@ -1776,6 +1781,7 @@ Content-Type: application/json
     "github": "https://github.com/zhangsan",
     "weibo": "",
     "status": 1,
+    "role": "USER",
     "lastLoginAt": "2024-01-20T10:30:00Z",
     "createdAt": "2024-01-01T00:00:00Z",
     "updatedAt": "2024-01-20T10:30:00Z"
@@ -1792,8 +1798,192 @@ Content-Type: application/json
 
 - 需要认证
 - 仅更新传入的非空字段，后端忽略未提供的字段
-- 可更新的字段：nickname / avatar / bio / website / github / weibo
+- 可更新的字段：nickname / avatar / bio / website / github / weibo（`role` / `status` 不可经此接口修改，需走「用户管理接口」）
 - 当 `avatar` 变化时，后端应删除旧的 OSS 头像文件（若旧 URL 指向本 OSS Bucket），避免每次换头像都堆积旧图
+
+---
+
+## 用户管理接口
+
+> **仅管理员（role=ADMIN）可用**：非管理员访问一律返回 403（业务码 403001），
+> 前端据此隐藏「管理」入口并拦截 `/admin/**` 路由。
+
+### 1. 分页获取用户列表
+
+**请求**
+
+```
+GET /users?page=1&pageSize=10&keyword=张
+Authorization: Bearer {accessToken}
+```
+
+**Query 参数**
+
+| 参数     | 类型   | 必填 | 说明                             |
+| -------- | ------ | ---- | -------------------------------- |
+| page     | int    | 否   | 页码，1 基，默认 1               |
+| pageSize | int    | 否   | 每页大小，默认 10                |
+| keyword  | string | 否   | 模糊匹配用户名 / 昵称 / 邮箱    |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "data": [
+      {
+        "id": 1,
+        "username": "zhangsan",
+        "nickname": "张三",
+        "email": "zhangsan@example.com",
+        "avatar": "https://example.com/avatar.jpg",
+        "bio": "",
+        "website": "",
+        "github": "",
+        "weibo": "",
+        "status": 1,
+        "role": "ADMIN",
+        "lastLoginAt": "2024-01-20T10:30:00Z",
+        "createdAt": "2024-01-01T00:00:00Z",
+        "updatedAt": "2024-01-20T10:30:00Z"
+      }
+    ],
+    "total": 42,
+    "page": 1,
+    "pageSize": 10,
+    "totalPages": 5
+  }
+}
+```
+
+**错误情况**
+
+- 401: 未登录或 accessToken 失效
+- 403: 非管理员（403001）
+
+**备注**
+
+- 仅 ADMIN；列表含邮箱等信息，GET 同样受限
+
+---
+
+### 2. 修改用户角色
+
+**请求**
+
+```
+PUT /users/{id}/role
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+**入参**
+
+```json
+{
+  "role": "USER"
+}
+```
+
+`role` 只能是 `ADMIN`（管理员）或 `USER`（普通用户）。
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "id": 2,
+    "username": "lisi",
+    "nickname": "李四",
+    "email": "lisi@example.com",
+    "avatar": "",
+    "bio": "",
+    "website": "",
+    "github": "",
+    "weibo": "",
+    "status": 1,
+    "role": "USER",
+    "lastLoginAt": "2024-01-19T08:00:00Z",
+    "createdAt": "2024-01-02T00:00:00Z",
+    "updatedAt": "2024-01-20T00:00:00Z"
+  }
+}
+```
+
+**错误情况**
+
+- 401: 未登录
+- 403: 非管理员（403001）
+- 404: 用户不存在
+- 400: 修改自己的角色 / 降级最后一个启用状态的管理员 / 参数非法
+
+**备注**
+
+- 仅 ADMIN
+- 生效即时：`JwtAuthenticationFilter` 每个请求都查库取 role，被降权用户的存量 token 下一次请求即被拒绝
+
+---
+
+### 3. 启用/禁用用户
+
+**请求**
+
+```
+PUT /users/{id}/status
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+**入参**
+
+```json
+{
+  "status": 0
+}
+```
+
+`status`：`1`=正常，`0`=禁用。
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "id": 2,
+    "username": "lisi",
+    "nickname": "李四",
+    "email": "lisi@example.com",
+    "avatar": "",
+    "bio": "",
+    "website": "",
+    "github": "",
+    "weibo": "",
+    "status": 0,
+    "role": "USER",
+    "lastLoginAt": "2024-01-19T08:00:00Z",
+    "createdAt": "2024-01-02T00:00:00Z",
+    "updatedAt": "2024-01-20T00:00:00Z"
+  }
+}
+```
+
+**错误情况**
+
+- 401: 未登录
+- 403: 非管理员（403001）
+- 404: 用户不存在
+- 400: 修改自己的状态 / 禁用最后一个启用状态的管理员 / 参数非法
+
+**备注**
+
+- 仅 ADMIN
+- 禁用即时生效：该用户存量 token 下一次请求返回 403（403002），登录返回 403「账号已被禁用」；重新启用后恢复
 
 ---
 
@@ -2289,6 +2479,7 @@ CREATE TABLE blog_users (
   avatar VARCHAR(255) DEFAULT NULL COMMENT '头像URL',
   bio VARCHAR(200) DEFAULT NULL COMMENT '个人简介',
   status TINYINT NOT NULL DEFAULT 1 COMMENT '1=正常, 0=禁用',
+  role VARCHAR(20) NOT NULL DEFAULT 'USER' COMMENT 'ADMIN=管理员, USER=普通用户',
   website VARCHAR(255) DEFAULT NULL,
   github VARCHAR(255) DEFAULT NULL,
   weibo VARCHAR(255) DEFAULT NULL,

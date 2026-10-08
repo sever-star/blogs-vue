@@ -39,7 +39,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/admin',
     component: () => import('@/components/AdminLayout.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
     redirect: '/admin/categories',
     children: [
       {
@@ -56,6 +56,11 @@ const routes: RouteRecordRaw[] = [
         path: 'review',
         name: 'AdminReview',
         component: () => import('@/views/admin/AdminReview.vue'),
+      },
+      {
+        path: 'users',
+        name: 'AdminUsers',
+        component: () => import('@/views/admin/AdminUsers.vue'),
       },
     ],
   },
@@ -84,6 +89,11 @@ router.beforeEach(async (to, from, next) => {
       next(false)
       return
     }
+  }
+  // 管理页面仅管理员可见（子路由通过 matched 继承 requiresAdmin）
+  if (to.matched.some((record) => record.meta.requiresAdmin) && !authStore.isAdmin) {
+    next('/')
+    return
   }
   next()
 })

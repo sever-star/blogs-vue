@@ -36,6 +36,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   // ---- 计算属性 ----
   const isLoggedIn = computed(() => !!accessToken.value && !!user.value)
+  /** 是否博主/管理员：控制「管理」入口与 /admin 路由 */
+  const isAdmin = computed(() => user.value?.role === 'ADMIN')
 
   // ---- 内部方法 ----
   async function fetchUser() {
@@ -160,6 +162,7 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken,
     user,
     isLoggedIn,
+    isAdmin,
     showLoginModal,
     loginMode,
     login,

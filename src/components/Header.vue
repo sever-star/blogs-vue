@@ -26,9 +26,9 @@
           写文章
         </router-link>
 
-        <!-- Admin link (all logged-in users act as admin) -->
+        <!-- Admin link (only visible to ADMIN role) -->
         <router-link
-          v-if="isLoggedIn"
+          v-if="isAdmin"
           to="/admin"
           class="nav-link"
         >
@@ -122,7 +122,7 @@ import {
 
 const router = useRouter()
 const authStore = useAuthStore()
-const { isLoggedIn, user, showLoginModal } = storeToRefs(authStore)
+const { isLoggedIn, isAdmin, user, showLoginModal } = storeToRefs(authStore)
 
 const handleCommand = (command: string) => {
   switch (command) {
