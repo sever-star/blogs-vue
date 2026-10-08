@@ -64,6 +64,7 @@ const mockUsers: Record<string, { password: string; user: User }> = {
       github: 'https://github.com/admin',
       weibo: '',
       status: 1,
+      role: 'ADMIN',
       lastLoginAt: new Date().toISOString(),
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: new Date().toISOString(),
@@ -82,6 +83,7 @@ const mockUsers: Record<string, { password: string; user: User }> = {
       github: 'https://github.com/demo',
       weibo: '',
       status: 1,
+      role: 'USER',
       lastLoginAt: new Date().toISOString(),
       createdAt: '2024-01-15T00:00:00Z',
       updatedAt: new Date().toISOString(),
@@ -261,7 +263,7 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     const newUser: User = {
       id: Date.now(), username: data.username, nickname: data.nickname || data.username,
       email: data.email, avatar: data.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.username}`,
-      bio: '', website: '', github: '', weibo: '', status: 1,
+      bio: '', website: '', github: '', weibo: '', status: 1, role: 'USER',
       lastLoginAt: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     }
     mockUsers[data.username] = { password: data.password, user: newUser }
