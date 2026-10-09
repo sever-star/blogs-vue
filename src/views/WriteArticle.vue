@@ -271,8 +271,8 @@ async function handleSubmit() {
     setTimeout(() => {
       router.push('/')
     }, 500)
-  } catch (error) {
-    ElMessage.error(isEdit.value ? '保存失败，请重试' : '发布失败，请重试')
+  } catch (error: any) {
+    ElMessage.error(error?.message || (isEdit.value ? '保存失败，请重试' : '发布失败，请重试'))
     console.error('提交失败:', error)
   } finally {
     publishing.value = false

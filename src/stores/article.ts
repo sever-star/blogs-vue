@@ -240,45 +240,16 @@ export const useArticleStore = defineStore('article', () => {
     return currentArticle.value
   }
 
-  /** 创建文章 */
+  /** 创建文章（接入真实 API: POST /posts） */
   const createArticle = async (payload: ArticlePayload): Promise<Article | null> => {
     try {
-      // TODO: 接入真实 API: POST /posts
-      // return await createArticleApi(payload)
-
-      const tagObjs = payload.tags
-        .map(tagId => mockTags.find(t => t.id === tagId))
-        .filter((t): t is Tag => !!t)
-
-      const newArticle: Article = {
-        id: Math.max(...allArticles.value.map(a => a.id), 0) + 1,
-        userId: 1,
-        title: payload.title,
-        contentMd: payload.contentMd,
-        contentHtml: '',
-        summary: payload.summary || payload.contentMd.replace(/[#*`>\-\[\]()!|[\]{}]/g, '').substring(0, 150).trim(),
-        coverImage: payload.coverImage || '',
-        readingTime: payload.readingTime || 0,
-        viewCount: 0,
-        likeCount: 0,
-        favCount: 0,
-        commentCount: 0,
-        status: payload.status ?? 1,
-        allowComment: payload.allowComment ?? true,
-        isTop: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        tags: tagObjs,
-        authorNickname: '当前用户',
-        authorAvatar: '',
-        liked: false,
-        favorited: false,
-      }
-      allArticles.value.unshift(newArticle)
-      return newArticle
+      const created = await createArticleApi(payload)
+      // 新建的文章默认 status=2 待审核，不进已发布列表缓存；列表在下次进入时重新拉取
+      return created
     } catch (error) {
       console.error('创建文章失败:', error)
-      return null
+      // 把后端的业务错误抛给调用方，页面才能显示具体原因（如参数校验失败）
+      throw error
     }
   }
 
