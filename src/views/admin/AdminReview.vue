@@ -8,7 +8,15 @@
         </div>
       </template>
 
-      <el-table :data="pending" v-loading="loading" border stripe>
+      <el-table
+        :data="pending"
+        v-loading="loading"
+        border
+        stripe
+        highlight-current-row
+        class="review-table"
+        @row-click="openDetail"
+      >
         <el-table-column prop="title" label="标题" min-width="220" show-overflow-tooltip />
         <el-table-column prop="authorNickname" label="作者" width="120" />
         <el-table-column label="标签" min-width="160">
@@ -21,12 +29,14 @@
         <el-table-column label="提交时间" width="180">
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="200" align="center">
+        <el-table-column label="操作" width="250" align="center">
           <template #default="{ row }">
-            <el-button type="primary" size="small" :loading="actingId === row.id" @click="handleApprove(row)">
+            <!-- .stop：防止触发整行的 openDetail（.detail 按钮自己会打开弹窗） -->
+            <el-button link type="primary" size="small" @click.stop="openDetail(row)">详情</el-button>
+            <el-button type="primary" size="small" :loading="actingId === row.id" @click.stop="handleApprove(row)">
               通过
             </el-button>
-            <el-button type="danger" size="small" :loading="actingId === row.id" @click="handleReject(row)">
+            <el-button type="danger" size="small" :loading="actingId === row.id" @click.stop="handleReject(row)">
               驳回
             </el-button>
           </template>
@@ -48,14 +58,58 @@
         />
       </div>
     </el-card>
+
+    <!-- 文章详情弹窗：点击行或「详情」打开，拉取正文并以 Markdown 渲染 -->
+    <el-dialog
+      v-model="detailVisible"
+      :title="detailRow?.title || '文章详情'"
+      width="780px"
+      top="6vh"
+      @closed="resetDetail"
+    >
+      <div v-loading="detailLoading" class="detail-body">
+        <div v-if="detailRow" class="detail-meta">
+          <span class="meta-item">作者：{{ detailRow.authorNickname || '—' }}</span>
+          <span v-if="detailRow.category" class="meta-item">分类：{{ detailRow.category.name }}</span>
+          <span class="meta-item">提交时间：{{ formatDate(detailRow.createdAt) }}</span>
+          <el-tag v-for="tag in detailRow.tags" :key="tag.id" size="small" type="info" class="tag">
+            {{ tag.name }}
+          </el-tag>
+        </div>
+        <div v-if="detailRow?.summary" class="detail-summary">{{ detailRow.summary }}</div>
+        <MDPreview v-if="detail?.contentMd" :text="detail.contentMd" preview-only />
+        <el-empty v-else-if="!detailLoading" description="正文加载失败" />
+      </div>
+      <template #footer>
+        <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button
+          v-if="detailRow"
+          type="primary"
+          :loading="actingId === detailRow.id"
+          @click="handleApprove(detailRow)"
+        >
+          通过
+        </el-button>
+        <el-button
+          v-if="detailRow"
+          type="danger"
+          :loading="actingId === detailRow.id"
+          @click="handleReject(detailRow)"
+        >
+          驳回
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getPendingArticles, approveArticle, rejectArticle } from '@/api/article'
-import type { ArticleListItem } from '@/types'
+import { MdPreview as MDPreview } from 'md-editor-v3'
+import 'md-editor-v3/lib/preview.css'
+import { getPendingArticles, getArticleById, approveArticle, rejectArticle } from '@/api/article'
+import type { Article, ArticleListItem } from '@/types'
 
 const loading = ref(false)
 const actingId = ref<number | null>(null)
@@ -63,6 +117,35 @@ const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const pending = ref<ArticleListItem[]>([])
+
+// 详情弹窗
+const detailVisible = ref(false)
+const detailLoading = ref(false)
+const detailRow = ref<ArticleListItem | null>(null)
+const detail = ref<Article | null>(null)
+
+/** 打开详情：列表行不含正文，需单独拉 GET /posts/{id} */
+function openDetail(row: ArticleListItem) {
+  detailRow.value = row
+  detail.value = null
+  detailVisible.value = true
+  detailLoading.value = true
+  getArticleById(row.id)
+    .then((article) => {
+      detail.value = article
+    })
+    .catch((e: any) => {
+      ElMessage.error(e?.message || '加载文章详情失败')
+    })
+    .finally(() => {
+      detailLoading.value = false
+    })
+}
+
+function resetDetail() {
+  detailRow.value = null
+  detail.value = null
+}
 
 /** 加载当前页待审核文章（审核最后一篇后自动回退一页） */
 async function loadPending() {
@@ -108,6 +191,7 @@ async function handleApprove(row: ArticleListItem) {
   try {
     await approveArticle(row.id)
     ElMessage.success('已通过，文章已发布')
+    detailVisible.value = false // 从弹窗内操作时同步关闭
     await loadPending()
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
@@ -130,6 +214,7 @@ async function handleReject(row: ArticleListItem) {
   try {
     await rejectArticle(row.id)
     ElMessage.success('已驳回，文章退回草稿')
+    detailVisible.value = false // 从弹窗内操作时同步关闭
     await loadPending()
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
@@ -179,5 +264,44 @@ onMounted(loadPending)
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+/* 行可点击提示 */
+.review-table :deep(.el-table__row) {
+  cursor: pointer;
+}
+
+.detail-body {
+  min-height: 200px;
+  max-height: 65vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #ebeef5;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.meta-item {
+  white-space: nowrap;
+}
+
+.detail-summary {
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  background: #f8fafc;
+  border-left: 3px solid #94a3b8;
+  border-radius: 0 4px 4px 0;
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.6;
 }
 </style>
