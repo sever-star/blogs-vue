@@ -77,7 +77,8 @@
           </el-tag>
         </div>
         <div v-if="detailRow?.summary" class="detail-summary">{{ detailRow.summary }}</div>
-        <MDPreview v-if="detail?.contentMd" :text="detail.contentMd" preview-only />
+        <!-- MdPreview 只认 modelValue，:text 不是合法 prop（会被忽略导致正文空白） -->
+        <MDPreview v-if="detail?.contentMd" :model-value="detail.contentMd" preview-only />
         <el-empty v-else-if="!detailLoading" description="正文加载失败" />
       </div>
       <template #footer>

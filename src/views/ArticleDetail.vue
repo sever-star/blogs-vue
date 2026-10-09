@@ -65,7 +65,8 @@
 
         <!-- 文章正文 -->
         <div class="article-content markdown-body">
-          <MDPreview :text="articleStore.currentArticle.contentMd" preview-only />
+          <!-- MdPreview 只认 modelValue，:text 不是合法 prop（会被忽略导致正文空白） -->
+          <MDPreview :model-value="articleStore.currentArticle.contentMd" preview-only />
         </div>
 
         <!-- 文章底部操作 -->
