@@ -226,16 +226,29 @@ export const useArticleStore = defineStore('article', () => {
     }
   }
 
+  // 详情请求序号：快速连点两篇文章时，旧请求可能后返回，
+  // 不丢弃过期响应会把当前文章覆盖成上一篇
+  let detailFetchSeq = 0
+
   /** 获取文章详情 */
   const fetchArticleById = async (id: number) => {
+    const seq = ++detailFetchSeq
+    // 先清空上一篇：否则点进文章 B 会先整页渲染旧文章 A、接口回来再换成 B，
+    // 高度差导致滚动位置跳变（"点文章跳来跳去"）
+    currentArticle.value = null
     loading.value = true
     try {
       // 接入真实 API: GET /posts/{id}（浏览量 viewCount 由后端自动 +1，前端不再本地累加）
-      currentArticle.value = await getArticleByIdApi(id)
+      const data = await getArticleByIdApi(id)
+      if (seq === detailFetchSeq) {
+        currentArticle.value = data
+      }
     } catch (error) {
       console.error('获取文章详情失败:', error)
     } finally {
-      loading.value = false
+      if (seq === detailFetchSeq) {
+        loading.value = false
+      }
     }
     return currentArticle.value
   }
