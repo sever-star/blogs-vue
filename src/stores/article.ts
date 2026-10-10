@@ -14,6 +14,7 @@ import {
   deleteArticle as deleteArticleApi,
   likeArticle as likeArticleApi,
   favoriteArticle as favoriteArticleApi,
+  unfavoriteArticle as unfavoriteArticleApi,
 } from '@/api/article'
 import type { ArticleQueryParams, ArticlePayload } from '@/types'
 
@@ -303,18 +304,39 @@ export const useArticleStore = defineStore('article', () => {
     }
   }
 
-  /** 收藏文章 */
+  /** 收藏文章：后端返回操作后的收藏总数，本地以返回值为准（不自增） */
   const favoriteArticle = async (id: number) => {
     try {
-      // TODO: 接入真实 API: POST /posts/{id}/favorite
-      // const { favCount } = await favoriteArticleApi(id)
+      const { favCount } = await favoriteArticleApi(id)
 
       const article = allArticles.value.find(a => a.id === id)
       if (article) {
-        article.favCount += 1
+        article.favCount = favCount
+      }
+      if (currentArticle.value?.id === id) {
+        currentArticle.value.favCount = favCount
+        currentArticle.value.favorited = true
       }
     } catch (error) {
       console.error('收藏失败:', error)
+    }
+  }
+
+  /** 取消收藏文章：返回操作后的收藏总数 */
+  const unfavoriteArticle = async (id: number) => {
+    try {
+      const { favCount } = await unfavoriteArticleApi(id)
+
+      const article = allArticles.value.find(a => a.id === id)
+      if (article) {
+        article.favCount = favCount
+      }
+      if (currentArticle.value?.id === id) {
+        currentArticle.value.favCount = favCount
+        currentArticle.value.favorited = false
+      }
+    } catch (error) {
+      console.error('取消收藏失败:', error)
     }
   }
 
@@ -360,6 +382,7 @@ export const useArticleStore = defineStore('article', () => {
     deleteArticle,
     likeArticle,
     favoriteArticle,
+    unfavoriteArticle,
     resetSelection,
     loadMore,
   }

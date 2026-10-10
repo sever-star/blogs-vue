@@ -1668,8 +1668,13 @@ Authorization: Bearer {accessToken}
 **错误情况**
 
 - 401: 未登录
-- 404: 文章不存在
+- 404: 文章不存在或已下架（需未软删且审核通过才可收藏）
 - 400: 已收藏过
+
+**备注**
+
+- `favCount` 是**操作后该文章的收藏总次数**（不是文章 ID，也不是 0/1 标记）
+- 服务端以收藏明细表 `blog_post_favorites` 重算总数，并同步 `blog_posts.fav_count` 冗余列（文章列表读该列）
 
 ---
 
@@ -1703,6 +1708,11 @@ Authorization: Bearer {accessToken}
 
 - 401: 未登录
 - 404: 文章不存在或未收藏
+
+**备注**
+
+- `favCount` 同上：操作后该文章的收藏总次数
+- 普通登录用户即可调用（`SecurityConfig` 中该路径声明为 `authenticated()`，不走管理员 DELETE 规则）
 
 ---
 
@@ -2934,8 +2944,9 @@ JPA 默认 `Boolean` ↔ `TINYINT(1)`；前端需确保收到 `0/1` 时按布尔
 
 - 评论：`GET/POST /posts/{articleId}/comments`、`GET/PUT/DELETE /posts/{articleId}/comments/{commentId}`、`POST/DELETE .../like`
 - 文章点赞：`POST/DELETE /posts/{id}/like`
-- 文章收藏：`POST/DELETE /posts/{id}/favorite`
-- 待审核列表：`GET /posts/pending`、审核 `PUT /posts/{id}/reject`
+- 审核拒绝：`PUT /posts/{id}/reject`
+
+已从本清单移除（后端已实现）：文章收藏 `POST/DELETE /posts/{id}/favorite`（2026-10-10 补齐 DELETE，登录即可、非管理员专属）、待审核列表 `GET /posts/pending`。
 - 浏览量排行：`GET /posts/top`
 
 ### 7. 创建文章的标签保存
