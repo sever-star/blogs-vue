@@ -319,6 +319,7 @@ export const useArticleStore = defineStore('article', () => {
       }
     } catch (error) {
       console.error('收藏失败:', error)
+      throw error // 详情页需要感知失败原因（未登录/已收藏等）并提示
     }
   }
 
@@ -337,6 +338,7 @@ export const useArticleStore = defineStore('article', () => {
       }
     } catch (error) {
       console.error('取消收藏失败:', error)
+      throw error
     }
   }
 

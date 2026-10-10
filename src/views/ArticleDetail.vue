@@ -77,6 +77,10 @@
                 <el-icon><Star /></el-icon>
                 点赞 ({{ articleStore.currentArticle.likeCount }})
               </el-button>
+              <el-button @click="handleFavorite" :type="isFavorited ? 'warning' : ''">
+                <el-icon><Collection /></el-icon>
+                {{ isFavorited ? '已收藏' : '收藏' }} ({{ articleStore.currentArticle.favCount }})
+              </el-button>
               <el-button>
                 <el-icon><ChatDotRound /></el-icon>
                 评论 ({{ articleStore.currentArticle.commentCount }})
@@ -100,7 +104,7 @@ import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 import { MdPreview as MDPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
-import { Star, ChatDotRound, User, Calendar, View, ArrowLeft, Edit } from '@element-plus/icons-vue'
+import { Star, ChatDotRound, User, Calendar, View, ArrowLeft, Edit, Collection } from '@element-plus/icons-vue'
 import CommentSection from '@/components/CommentSection.vue'
 
 const route = useRoute()
@@ -128,6 +132,37 @@ onMounted(async () => {
 
 function handleLike() {
   ElMessage.success('已点赞')
+}
+
+// 是否已收藏：详情接口仅在登录时返回 favorited，游客看到的是未收藏态
+const isFavorited = computed(() => !!articleStore.currentArticle?.favorited)
+
+async function handleFavorite() {
+  if (!authStore.isLoggedIn) {
+    ElMessage.warning('请先登录后再收藏')
+    return
+  }
+  try {
+    if (isFavorited.value) {
+      await articleStore.unfavoriteArticle(articleId.value)
+      ElMessage.success('已取消收藏')
+    } else {
+      await articleStore.favoriteArticle(articleId.value)
+      ElMessage.success('已收藏')
+    }
+  } catch (error) {
+    ElMessage.error(errorText(error, '收藏失败'))
+  }
+}
+
+// 与 AiChat 同款：API 错误可能是 { message } 对象或字符串
+function errorText(error: unknown, fallback: string): string {
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = String((error as { message?: unknown }).message ?? '')
+    if (message) return message
+  }
+  if (typeof error === 'string' && error) return error
+  return fallback
 }
 
 function handleEdit() {
