@@ -5,7 +5,6 @@ import {
   getTags as getTagsApi,
   getCategories as getCategoriesApi,
   getArticles as getArticlesApi,
-  getTopArticles as getTopArticlesApi,
   getPendingArticles as getPendingArticlesApi,
   approveArticle as approveArticleApi,
   rejectArticle as rejectArticleApi,
@@ -168,12 +167,12 @@ export const useArticleStore = defineStore('article', () => {
     }
   }
 
-  /** 获取浏览量排行 */
+  /** 获取浏览量排行（后端无 GET /posts/top：基于 GET /posts 列表按 viewCount 本地排序） */
   const fetchTopArticles = async (limit = 10) => {
     try {
-      // TODO: 接入真实 API: GET /posts/top?limit=10
-      // topViewedArticles.value = await getTopArticlesApi(limit)
-      topViewedArticles.value = allArticles.value
+      // 后端浏览量在 GET /posts/{id} 查询后由 ViewCountService 防刷自动 +1，
+      // 列表接口返回的是各文章累计值，这里直接用真实列表排序（不再用 mock 的 allArticles）
+      topViewedArticles.value = articles.value
         .filter(a => a.status === 1)
         .sort((a, b) => b.viewCount - a.viewCount)
         .slice(0, limit)

@@ -30,6 +30,7 @@ export const getArticles = async (params?: ArticleQueryParams): Promise<ArticleL
 /**
  * 获取浏览量排行（按 viewCount 降序，返回前 N 条）
  * GET /posts/top?limit=10
+ * 注意：后端暂无此接口，store 的 fetchTopArticles 已改用 GET /posts 列表本地排序替代
  */
 export const getTopArticles = async (limit = 10): Promise<ArticleListItem[]> => {
   return client.get('/posts/top', { params: { limit } })
