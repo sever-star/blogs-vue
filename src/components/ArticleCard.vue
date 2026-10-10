@@ -7,17 +7,7 @@
 
       <p class="article-excerpt">{{ article.summary }}</p>
 
-      <div class="article-meta">
-        <span class="publish-time">
-          <el-icon><Calendar /></el-icon>
-          {{ formatDate(article.createdAt) }}
-        </span>
-        <span class="author">
-          <el-icon><User /></el-icon>
-          {{ article.authorNickname }}
-        </span>
-      </div>
-
+      <!-- 分类 + 时间 + 用户合并为一行（此前拆成两个 meta 块，时间/用户重复渲染了两次） -->
       <div class="article-meta">
         <span class="category" v-if="article.category">
           <el-tag type="success" size="small">
