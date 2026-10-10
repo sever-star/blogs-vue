@@ -74,6 +74,11 @@ function getRouterBase() {
 const router = createRouter({
   history: createWebHistory(getRouterBase()),
   routes,
+  // 滚动行为：进入新页面回顶部；后退/前进（如从文章详情返回首页）恢复离开时的滚动位置。
+  // 不配置时 SPA 切换沿用上一页的 scrollY：点进文章会停在页面中部，返回后位置也对不上。
+  scrollBehavior(_to, _from, savedPosition) {
+    return savedPosition || { top: 0 }
+  },
 })
 
 // 路由守卫：检查是否需要认证

@@ -183,9 +183,11 @@ onMounted(async () => {
     await nextTick()
     updateScrollState()
     await articleStore.fetchTags()
-    // 返回首页时重置为「全部」：显式传 null 清空 store 里的 selectedCategory/selectedTag，
-    // 否则 fetchArticles 无参时保留上次选中的分类，导致按钮显示全部、数据却是旧分类
-    await articleStore.fetchArticles(1, null, null)
+    // 返回首页时重置筛选为「全部」：显式传 null 清空 store 里的 selectedCategory/selectedTag，
+    // 否则 fetchArticles 无参时保留上次选中的分类，导致按钮显示全部、数据却是旧分类。
+    // 页码传 currentPage 而非 1：打回 1 页会把已加载列表缩回前 10 条，
+    // 内容高度不够时 scrollBehavior 的 savedPosition 恢复不了原来的滚动位置
+    await articleStore.fetchArticles(articleStore.currentPage || 1, null, null)
     await articleStore.fetchTopArticles()
   } catch (error) {
     ElMessage.error('加载数据失败')
