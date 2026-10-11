@@ -426,10 +426,11 @@ async function handleConfirm() {
 // 从 DeepSeek 等页面复制「渲染后」的文字时，text/plain 里没有 #/** 等标记（格式丢失），
 // 但 text/html 里结构还在。这里拦截粘贴，把 HTML 转成 Markdown 插入编辑器。
 
-/** 粘贴事件：编辑器内 textarea 专属，其余走默认行为 */
+/** 粘贴事件：md-editor 的编辑区是 CodeMirror6 的 .cm-content（contenteditable），不是 textarea */
 function handlePaste(e: ClipboardEvent) {
   const target = e.target as HTMLElement | null
-  if (!target || target.tagName !== 'TEXTAREA') return
+  if (!target || typeof target.closest !== 'function') return
+  if (!target.closest('.cm-content, textarea, [contenteditable="true"]')) return
 
   const clipboard = e.clipboardData
   if (!clipboard) return
@@ -443,22 +444,12 @@ function handlePaste(e: ClipboardEvent) {
   // 没有结构化标签的 HTML 不值得转换
   if (!/<(h[1-6]|strong|b|em|i|del|s|ul|ol|li|pre|blockquote|table|a)\b/i.test(html)) return
 
-  e.preventDefault()
   const md = htmlToMarkdown(html)
   if (!md) return
 
-  const textarea = target as HTMLTextAreaElement
-  const start = textarea.selectionStart
-  const end = textarea.selectionEnd
-  const before = textarea.value.slice(0, start)
-  const after = textarea.value.slice(end)
-  // 块级 Markdown 插到行中间时补空行，避免和上下文黏成一段
-  const insert = `${before && !before.endsWith('\n') ? '\n\n' : ''}${md}${after && !after.startsWith('\n') ? '\n' : ''}`
-
-  textarea.value = before + insert + after
-  textarea.selectionStart = textarea.selectionEnd = start + insert.length
-  // 触发 md-editor 的 v-model（它监听 textarea 的 input 事件）
-  textarea.dispatchEvent(new Event('input', { bubbles: true }))
+  // 不阻止默认粘贴：CodeMirror6 只读 text/plain，把纯文本替换成转换结果，
+  // 它插入的自然就是 Markdown（textarea 场景浏览器默认同样取 text/plain）
+  clipboard.setData('text/plain', md)
   ElMessage.success('已识别富文本并转换为 Markdown 格式')
 }
 
