@@ -126,6 +126,13 @@ client.interceptors.response.use(
       return Promise.reject(error.response?.data || error.message)
     }
 
+    // /auth/login、/auth/register 的 401 是「用户名或密码错误」这类业务失败，
+    // 不是 accessToken 过期。若落入下面的刷新分支：刷新失败 → forceLogout 整页刷新，
+    // 登录弹窗和失败提示会被一起刷掉（表现为「登录失败没有任何提示」）。
+    if (config.url === '/auth/login' || config.url === '/auth/register') {
+      return Promise.reject(error.response?.data || error.message)
+    }
+
     // 刷新请求本身失败 → refresh token 也无效/过期，强制登出
     if (config.url === '/auth/refresh') {
       forceLogout()

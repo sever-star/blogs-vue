@@ -80,7 +80,8 @@ export const useAuthStore = defineStore('auth', () => {
       return true
     } catch (error) {
       console.error('[auth] 登录失败:', error)
-      return false
+      // 抛给调用方：登录弹窗需要展示后端的具体原因（用户名或密码错误/账号被禁用等）
+      throw error
     }
   }
 

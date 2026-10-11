@@ -201,6 +201,13 @@ async function handleLogin() {
       } else {
         ElMessage.error('用户名或密码错误')
       }
+    } catch (error) {
+      // 拦截器已排除登录接口的 401 刷新分支，这里能正常弹出后端返回的失败原因
+      const message =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message?: unknown }).message ?? '')
+          : ''
+      ElMessage.error(message || '登录失败，请稍后重试')
     } finally {
       loading.value = false
     }
