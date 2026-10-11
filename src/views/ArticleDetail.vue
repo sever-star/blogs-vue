@@ -97,7 +97,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useArticleStore } from '@/stores/article'
 import { useAuthStore } from '@/stores/auth'
@@ -121,13 +121,25 @@ const isAuthor = computed(
     articleStore.currentArticle?.userId === authStore.user.id
 )
 
+// 记录进入详情页前的标题：新标签页打开时是 index.html 的「个人博客」，
+// 离开详情页（SPA 内返回）时恢复，避免文章标题残留到其他页面
+const previousTitle = document.title
+
 onMounted(async () => {
   try {
     await articleStore.fetchArticleById(articleId.value)
+    // 标签页标题跟随文章标题（文章卡在新标签页打开时展示的就是它）
+    if (articleStore.currentArticle) {
+      document.title = articleStore.currentArticle.title
+    }
   } catch (error) {
     ElMessage.error('加载文章失败')
     console.error('加载文章失败:', error)
   }
+})
+
+onUnmounted(() => {
+  document.title = previousTitle
 })
 
 function handleLike() {
