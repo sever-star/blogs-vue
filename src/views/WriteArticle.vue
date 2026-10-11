@@ -1,128 +1,131 @@
 <template>
   <main class="write-article">
     <div class="write-container">
-      <h1 class="page-title">{{ isEdit ? '编辑文章' : '写文章' }}</h1>
-
-      <el-card class="editor-card">
-        <template #header>
-          <div class="card-header">
-            <span>文章编辑器</span>
-            <div v-if="!authStore.isLoggedIn" class="login-required">
-              请先 <el-button link @click="handleLogin">登录</el-button> 后发表文章
-            </div>
+      <!-- 顶部工具栏：保存草稿 / 提交审核 同一行 -->
+      <div class="editor-toolbar">
+        <div class="toolbar-left">
+          <h1 class="page-title">{{ isEdit ? '编辑文章' : '写文章' }}</h1>
+          <div v-if="!authStore.isLoggedIn" class="login-required">
+            请先 <el-button link @click="handleLogin">登录</el-button> 后发表文章
           </div>
-        </template>
+        </div>
+        <div class="toolbar-actions">
+          <el-button v-if="!isEdit" :loading="publishing" @click="openMetaDialog('draft')">
+            保存草稿
+          </el-button>
+          <el-button type="primary" :loading="publishing" @click="openMetaDialog('submit')">
+            {{ isEdit ? '保存修改' : '提交审核' }}
+          </el-button>
+        </div>
+      </div>
 
-        <el-form :model="formData" label-width="100px" @submit.prevent="handleSubmit">
-          <!-- 文章标题 -->
-          <el-form-item label="文章标题" required>
-            <el-input
-              v-model="formData.title"
-              placeholder="请输入文章标题"
-              clearable
-              maxlength="100"
-              show-word-limit
-              @keyup.enter="focusedField = 'tags'"
-            />
-          </el-form-item>
-
-          <!-- 文章分类 -->
-          <el-form-item label="文章分类" required>
-            <el-select
-              v-model="formData.categoryId"
-              placeholder="请选择文章分类"
-              style="width: 100%"
-              clearable
-            >
-              <el-option
-                v-for="category in categoryStore.categoryOptions"
-                :key="category.value"
-                :label="category.label"
-                :value="category.value"
-              />
-            </el-select>
-          </el-form-item>
-
-          <!-- 文章标签 -->
-          <el-form-item label="文章标签" required>
-            <el-select
-              v-model="formData.tags"
-              multiple
-              filterable
-              allow-create
-              default-first-option
-              placeholder="选择或创建标签"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="tag in availableTags"
-                :key="tag"
-                :label="tag"
-                :value="tag"
-              />
-            </el-select>
-          </el-form-item>
-
-          <!-- 文章封面（可选）：点击选择本地图片，选中即上传 OSS，URL 随文章提交 -->
-          <el-form-item label="文章封面">
-            <div class="cover-field">
-              <el-upload
-                class="cover-uploader"
-                :auto-upload="false"
-                :show-file-list="false"
-                accept="image/*"
-                :disabled="coverUploading"
-                :on-change="handleCoverSelect"
-              >
-                <div class="cover-box" :class="{ 'is-empty': !formData.coverImage }">
-                  <el-icon v-if="coverUploading" class="is-loading"><Loading /></el-icon>
-                  <span v-else-if="!formData.coverImage" class="cover-prompt">点击选择本地图片</span>
-                  <img v-else :src="formData.coverImage" alt="封面预览" />
-                  <button
-                    v-if="formData.coverImage && !coverUploading"
-                    type="button"
-                    class="cover-remove"
-                    title="移除封面"
-                    @click.stop="handleCoverRemove"
-                  >
-                    ×
-                  </button>
-                </div>
-              </el-upload>
-              <p v-if="!formData.coverImage" class="cover-hint">
-                可选；选中后立即上传，封面 URL 随文章一起提交
-              </p>
-            </div>
-          </el-form-item>
-
-          <!-- Markdown 编辑器 -->
-          <el-form-item label="文章内容" required>
-            <div class="editor-wrapper">
-              <MDEditor
-                v-model="formData.content"
-                preview="edit"
-                height="500px"
-                :plugins="[MDEditorMermaid, MDEditorCodeTheme]"
-              />
-            </div>
-          </el-form-item>
-
-          <!-- 操作按钮 -->
-          <el-form-item>
-            <el-button
-              v-if="authStore.isLoggedIn"
-              type="primary"
-              @click="handleSubmit"
-              :loading="publishing"
-            >
-              {{ isEdit ? '保存修改' : '提交审核' }}
-            </el-button>
-            <el-button @click="handleReset">重置</el-button>
-            <el-button @click="handleCancel">取消</el-button>
-          </el-form-item>
-        </el-form>
-      </el-card>
+      <!-- 编辑区域占满整页余下空间 -->
+      <div class="editor-area">
+        <MDEditor
+          v-model="formData.content"
+          preview="edit"
+          :height="editorHeight"
+          :plugins="[MDEditorMermaid, MDEditorCodeTheme]"
+        />
+      </div>
     </div>
+
+    <!-- 信息悬浮窗口：点击「提交审核 / 保存草稿」后弹出，填写标题/分类/标签/封面 -->
+    <el-dialog
+      v-model="metaDialogVisible"
+      :title="dialogTitle"
+      width="560px"
+      :close-on-click-modal="false"
+    >
+      <el-form :model="formData" label-width="90px">
+        <!-- 文章标题 -->
+        <el-form-item label="文章标题" required>
+          <el-input
+            v-model="formData.title"
+            placeholder="请输入文章标题"
+            clearable
+            maxlength="100"
+            show-word-limit
+          />
+        </el-form-item>
+
+        <!-- 文章分类 -->
+        <el-form-item label="文章分类" required>
+          <el-select
+            v-model="formData.categoryId"
+            placeholder="请选择文章分类"
+            style="width: 100%"
+            clearable
+          >
+            <el-option
+              v-for="category in categoryStore.categoryOptions"
+              :key="category.value"
+              :label="category.label"
+              :value="category.value"
+            />
+          </el-select>
+        </el-form-item>
+
+        <!-- 文章标签 -->
+        <el-form-item label="文章标签" required>
+          <el-select
+            v-model="formData.tags"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            placeholder="选择或创建标签"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="tag in availableTags"
+              :key="tag"
+              :label="tag"
+              :value="tag"
+            />
+          </el-select>
+        </el-form-item>
+
+        <!-- 文章封面（可选）：点击选择本地图片，选中即上传 OSS，URL 随文章提交 -->
+        <el-form-item label="文章封面">
+          <div class="cover-field">
+            <el-upload
+              class="cover-uploader"
+              :auto-upload="false"
+              :show-file-list="false"
+              accept="image/*"
+              :disabled="coverUploading"
+              :on-change="handleCoverSelect"
+            >
+              <div class="cover-box" :class="{ 'is-empty': !formData.coverImage }">
+                <el-icon v-if="coverUploading" class="is-loading"><Loading /></el-icon>
+                <span v-else-if="!formData.coverImage" class="cover-prompt">点击选择本地图片</span>
+                <img v-else :src="formData.coverImage" alt="封面预览" />
+                <button
+                  v-if="formData.coverImage && !coverUploading"
+                  type="button"
+                  class="cover-remove"
+                  title="移除封面"
+                  @click.stop="handleCoverRemove"
+                >
+                  ×
+                </button>
+              </div>
+            </el-upload>
+            <p v-if="!formData.coverImage" class="cover-hint">
+              可选；选中后立即上传，封面 URL 随文章一起提交
+            </p>
+          </div>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="metaDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="publishing" @click="handleConfirm">
+          {{ confirmLabel }}
+        </el-button>
+      </template>
+    </el-dialog>
   </main>
 </template>
 
@@ -152,8 +155,28 @@ const categoryStore = useCategoryStore()
 
 const isEdit = computed(() => !!route.params.id)
 const editId = computed(() => Number(route.params.id))
-const focusedField = ref('')
 const publishing = ref(false)
+
+// ---- 信息悬浮窗口（标题/分类/标签/封面在提交时才填写） ----
+
+const metaDialogVisible = ref(false)
+// draft = 保存草稿（status 0）；submit = 提交审核（status 2）
+const dialogMode = ref<'draft' | 'submit'>('submit')
+// 先存的草稿 id：之后点提交审核改为更新这篇草稿，避免产生重复文章
+const draftId = ref<number | null>(null)
+
+const dialogTitle = computed(() => {
+  if (isEdit.value) return '编辑文章信息'
+  return dialogMode.value === 'draft' ? '完善文章信息（保存草稿）' : '完善文章信息'
+})
+
+const confirmLabel = computed(() => {
+  if (isEdit.value) return '保存修改'
+  return dialogMode.value === 'draft' ? '保存草稿' : '提交审核'
+})
+
+// 编辑器高度：占满除站头(70)、页面内边距(24)、工具栏(32+12)以外的全部视口
+const editorHeight = 'calc(100vh - 140px)'
 
 const formData = ref({
   title: '',
@@ -305,13 +328,27 @@ async function loadArticleForEdit() {
   formData.value.coverImage = article.coverImage || ''
 }
 
-async function handleSubmit() {
+/**
+ * 点击工具栏按钮 → 弹出信息悬浮窗口。
+ * 内容先写在编辑器里，标题/分类/标签/封面在弹窗里补全后一并提交。
+ */
+function openMetaDialog(mode: 'draft' | 'submit') {
   if (!authStore.isLoggedIn) {
     ElMessage.warning('请先登录')
     authStore.openLoginModal()
     return
   }
+  // 内容不合格就不必弹窗了（弹窗里没有内容输入，校验放最后也没意义）
+  if (formData.value.content.trim().length < 50) {
+    ElMessage.warning('文章内容至少 50 个字符')
+    return
+  }
+  dialogMode.value = mode
+  metaDialogVisible.value = true
+}
 
+/** 弹窗确认：全量校验后按模式提交（草稿 status 0 / 提交审核 status 2） */
+async function handleConfirm() {
   if (!validateForm()) {
     return
   }
@@ -335,19 +372,40 @@ async function handleSubmit() {
         status: 2, // 修改后重新提交审核
       })
       ElMessage.success('修改已保存，等待重新审核')
+      metaDialogVisible.value = false
       router.push(`/article/${editId.value}`)
       return
     }
 
-    await articleStore.createArticle({
+    const status = dialogMode.value === 'draft' ? 0 : 2
+    const payload = {
       title: formData.value.title,
       contentMd: formData.value.content,
       categoryId: formData.value.categoryId,
       tags: selectedTagIds,
-      // 创建时留空不传字段，cover_image 保持 NULL 而非空串
+      // 创建时留空不传字段，cover_image 保持 NULL 而非空串；编辑草稿时同编辑逻辑带空串
       coverImage: formData.value.coverImage.trim() || undefined,
-      status: 2, // 提交审核
-    })
+      status,
+    }
+
+    if (draftId.value !== null) {
+      // 已有草稿：后续操作（含提交审核）都更新同一篇，不重复建文章
+      await articleStore.updateArticle(draftId.value, {
+        ...payload,
+        coverImage: formData.value.coverImage.trim(),
+      })
+    } else {
+      const created = await articleStore.createArticle(payload)
+      draftId.value = created?.id ?? null
+    }
+
+    metaDialogVisible.value = false
+
+    if (status === 0) {
+      // 存草稿：留在编辑页继续写
+      ElMessage.success('草稿已保存')
+      return
+    }
 
     ElMessage.success('已提交审核，等待管理员审核')
     handleReset()
@@ -372,10 +430,7 @@ function handleReset() {
     content: '',
     coverImage: '',
   }
-}
-
-function handleCancel() {
-  router.back()
+  draftId.value = null
 }
 
 function handleLogin() {
@@ -384,36 +439,53 @@ function handleLogin() {
 </script>
 
 <style scoped>
+/* 固定视口高度 + 不滚动：整页余下区域全部给编辑器，滚动发生在编辑器内部 */
 .write-article {
-  min-height: calc(100vh - 70px);
+  height: calc(100vh - 70px);
   background-color: #f5f5f5;
-  padding: 20px 0;
+  padding: 12px 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .write-container {
-  max-width: 900px;
-  margin: 0 auto;
+  height: 100%;
   padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 顶部工具栏：左侧标题/登录提示，右侧保存草稿 + 提交审核同一行 */
+.editor-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .page-title {
-  margin: 0 0 20px 0;
-  font-size: 28px;
+  margin: 0;
+  font-size: 22px;
   font-weight: 600;
   color: #333;
-}
-
-.editor-card {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
+  white-space: nowrap;
 }
 
 .login-required {
@@ -425,10 +497,13 @@ function handleLogin() {
   color: #f56c6c;
 }
 
-.editor-wrapper {
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+/* 编辑区域：吃掉工具栏以外的全部剩余高度 */
+.editor-area {
+  flex: 1;
+  min-height: 0;
+  border-radius: 8px;
   overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .cover-field {
@@ -510,7 +585,7 @@ function handleLogin() {
   }
 
   .page-title {
-    font-size: 24px;
+    font-size: 18px;
   }
 }
 </style>
