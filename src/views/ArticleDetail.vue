@@ -1,16 +1,16 @@
 <template>
   <main class="article-detail">
     <div class="detail-container">
-      <!-- 左栏：返回按钮 + 文章 -->
-      <div class="detail-main">
-        <!-- 返回按钮 -->
-        <div class="back-button">
-          <el-button link @click="handleBack">
-            <el-icon><ArrowLeft /></el-icon>
-            返回
-          </el-button>
-        </div>
+      <!-- 返回按钮独占整行：下方正文与作者卡片从同一起跑线开始，顶边对齐 -->
+      <div class="back-button">
+        <el-button link @click="handleBack">
+          <el-icon><ArrowLeft /></el-icon>
+          返回
+        </el-button>
+      </div>
 
+      <!-- 左栏：文章 -->
+      <div class="detail-main">
         <!-- 加载状态 -->
         <div v-if="articleStore.loading && !articleStore.currentArticle" class="loading">
           <el-skeleton :rows="5" animated />
@@ -279,6 +279,7 @@ function formatDate(dateString: string): string {
 }
 
 .back-button {
+  grid-column: 1 / -1;
   margin-bottom: 16px;
 }
 
