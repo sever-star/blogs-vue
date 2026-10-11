@@ -19,12 +19,11 @@
         </div>
       </div>
 
-      <!-- 编辑区域占满整页余下空间；capture 拦截粘贴，富文本转 Markdown -->
-      <div class="editor-area" @paste.capture="handlePaste">
+      <!-- 编辑区域占满整页余下空间；粘贴监听挂在 window 捕获阶段（见 script） -->
+      <div class="editor-area">
         <MDEditor
           v-model="formData.content"
           preview="edit"
-          :height="editorHeight"
           :plugins="[MDEditorMermaid, MDEditorCodeTheme]"
         />
       </div>
@@ -130,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useArticleStore } from '@/stores/article'
 import { useAuthStore } from '@/stores/auth'
@@ -174,9 +173,6 @@ const confirmLabel = computed(() => {
   if (isEdit.value) return '保存修改'
   return dialogMode.value === 'draft' ? '保存草稿' : '提交审核'
 })
-
-// 编辑器高度：占满除站头(70)、页面内边距(24)、工具栏(32+12)以外的全部视口
-const editorHeight = 'calc(100vh - 140px)'
 
 const formData = ref({
   title: '',
@@ -238,6 +234,14 @@ onMounted(() => {
   categoryStore.fetchCategories()
   articleStore.fetchTags(true)
   loadArticleForEdit()
+  // 粘贴监听挂 window 捕获阶段：先于 CodeMirror 自身的 handler 执行，
+  // 且不依赖组件 DOM 结构（此前挂组件 div 上怀疑未生效）
+  // paste 不在 WindowEventMap 里，TS 要求监听器签名是 EventListener，此处断言
+  window.addEventListener('paste', handlePaste as EventListener, true)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('paste', handlePaste as EventListener, true)
 })
 
 function validateForm(): boolean {
@@ -426,31 +430,48 @@ async function handleConfirm() {
 // 从 DeepSeek 等页面复制「渲染后」的文字时，text/plain 里没有 #/** 等标记（格式丢失），
 // 但 text/html 里结构还在。这里拦截粘贴，把 HTML 转成 Markdown 插入编辑器。
 
-/** 粘贴事件：md-editor 的编辑区是 CodeMirror6 的 .cm-content（contenteditable），不是 textarea */
+/**
+ * 粘贴事件（window 捕获阶段）：把 DeepSeek 等渲染页面复制的富文本转成 Markdown。
+ * md-editor 内部（CodeMirror6）与它自己的 paste handler 都只读 text/plain，
+ * 所以不阻止默认行为，直接把剪贴板纯文本替换成转换结果即可。
+ * 带诊断提示：每次带 HTML 的粘贴都会告知走了哪条分支，方便定位。
+ */
 function handlePaste(e: ClipboardEvent) {
   const target = e.target as HTMLElement | null
   if (!target || typeof target.closest !== 'function') return
-  if (!target.closest('.cm-content, textarea, [contenteditable="true"]')) return
+  // 只处理编辑器输入面（CodeMirror 的 .cm-content），标题等普通输入框不拦截
+  if (!target.closest('.cm-content')) return
 
   const clipboard = e.clipboardData
-  if (!clipboard) return
-  const html = clipboard.getData('text/html')
-  if (!html) return // 纯文本粘贴（含 DeepSeek 复制按钮复制的 Markdown 源码）走默认
+  const html = clipboard?.getData('text/html') ?? ''
+  const plain = clipboard?.getData('text/plain') ?? ''
+  console.info('[paste] html=%d字节, plain=%o', html.length, plain.slice(0, 80))
 
-  const plain = clipboard.getData('text/plain')
-  // 剪贴板纯文本本身已是 Markdown（如复制代码块里的源码）→ 原样粘贴，不要二次转换
-  if (/^#{1,6}\s|^\s*[-*]\s|^\s*\d+\.\s|\*\*|```/m.test(plain)) return
+  if (!clipboard || !html) {
+    ElMessage.info('粘贴诊断:剪贴板没有 HTML 数据(仅纯文本)')
+    return
+  }
 
-  // 没有结构化标签的 HTML 不值得转换
-  if (!/<(h[1-6]|strong|b|em|i|del|s|ul|ol|li|pre|blockquote|table|a)\b/i.test(html)) return
+  // 纯文本本身已是 Markdown（DeepSeek 复制按钮/代码块源码）→ 原样粘贴
+  if (/^#{1,6}\s|^\s*[-*]\s|^\s*\d+\.\s|\*\*|```/m.test(plain)) {
+    ElMessage.info('粘贴诊断:纯文本已是 Markdown,原样插入')
+    return
+  }
 
-  const md = htmlToMarkdown(html)
-  if (!md) return
-
-  // 不阻止默认粘贴：CodeMirror6 只读 text/plain，把纯文本替换成转换结果，
-  // 它插入的自然就是 Markdown（textarea 场景浏览器默认同样取 text/plain）
-  clipboard.setData('text/plain', md)
-  ElMessage.success('已识别富文本并转换为 Markdown 格式')
+  try {
+    const md = htmlToMarkdown(html)
+    console.info('[paste] 转换结果:', md.slice(0, 200))
+    if (!md || md === plain.trim()) {
+      ElMessage.info(`粘贴诊断:HTML 转换后无变化(${html.length}字节)`)
+      return
+    }
+    // CM6/md-editor 的粘贴只取 text/plain——替换成 Markdown 后默认粘贴插入的就是它
+    clipboard.setData('text/plain', md)
+    ElMessage.success('已识别富文本并转换为 Markdown 格式')
+  } catch (error) {
+    console.error('[paste] HTML→Markdown 转换失败:', error)
+    ElMessage.error('粘贴诊断:转换出错,详情见控制台')
+  }
 }
 
 /** 剪贴板 HTML → Markdown（覆盖 DeepSeek 常渲染的标签） */
@@ -709,6 +730,8 @@ function handleLogin() {
 
 :deep(.md-editor) {
   border: none !important;
+  /* height 属性传 calc 不生效（组件内部按 px 处理），改用 CSS 强制撑满编辑区 */
+  height: 100% !important;
 }
 
 @media (max-width: 768px) {
