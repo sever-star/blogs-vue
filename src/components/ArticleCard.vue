@@ -55,6 +55,11 @@
         <span class="stat-label">评论</span>
       </div>
     </div>
+
+    <!-- 封面：卡片最右侧；后端未存封面时不占位 -->
+    <div v-if="article.coverImage" class="card-cover">
+      <img :src="article.coverImage" :alt="article.title" loading="lazy" />
+    </div>
   </div>
 </template>
 
@@ -183,6 +188,20 @@ function formatDate(dateString: string): string {
   min-width: 120px;
 }
 
+.card-cover {
+  flex-shrink: 0;
+  margin-left: 20px;
+}
+
+.card-cover img {
+  display: block;
+  width: 160px;
+  height: 100px;
+  object-fit: cover;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
 .stat-item {
   display: flex;
   flex-direction: column;
@@ -216,6 +235,18 @@ function formatDate(dateString: string): string {
 
   .card-stats {
     gap: 12px;
+  }
+
+  /* 窄屏卡片纵向堆叠：封面改为整行宽度的横幅 */
+  .card-cover {
+    margin-left: 0;
+    margin-top: 12px;
+    width: 100%;
+  }
+
+  .card-cover img {
+    width: 100%;
+    height: 160px;
   }
 }
 </style>

@@ -63,6 +63,20 @@
             </el-select>
           </el-form-item>
 
+          <!-- 文章封面（可选）：后端 cover_image 存 URL，留空则列表不展示封面 -->
+          <el-form-item label="文章封面">
+            <div class="cover-field">
+              <el-input
+                v-model="formData.coverImage"
+                placeholder="封面图片 URL（可选，需以 http:// 或 https:// 开头）"
+                clearable
+              />
+              <div v-if="formData.coverImage.trim()" class="cover-preview">
+                <img :src="formData.coverImage.trim()" alt="封面预览" />
+              </div>
+            </div>
+          </el-form-item>
+
           <!-- Markdown 编辑器 -->
           <el-form-item label="文章内容" required>
             <div class="editor-wrapper">
@@ -125,6 +139,7 @@ const formData = ref({
   categoryId: undefined as number | undefined,
   tags: [] as string[],
   content: '',
+  coverImage: '',
 })
 
 const availableTags = computed(() => articleStore.tags.map((tag) => tag.name))
@@ -161,6 +176,12 @@ function validateForm(): boolean {
 
   if (formData.value.content.trim().length < 50) {
     ElMessage.warning('文章内容至少 50 个字符')
+    return false
+  }
+
+  const coverImage = formData.value.coverImage.trim()
+  if (coverImage && !/^https?:\/\//i.test(coverImage)) {
+    ElMessage.warning('封面地址需以 http:// 或 https:// 开头')
     return false
   }
 
@@ -222,6 +243,7 @@ async function loadArticleForEdit() {
   formData.value.categoryId = article.category?.id
   formData.value.tags = article.tags.map((t) => t.name)
   formData.value.content = article.contentMd
+  formData.value.coverImage = article.coverImage || ''
 }
 
 async function handleSubmit() {
@@ -243,12 +265,16 @@ async function handleSubmit() {
       return
     }
 
+    // 留空时不传该字段：更新接口只在收到非 null 的 coverImage 时才覆盖，避免误清已有封面
+    const coverImage = formData.value.coverImage.trim() || undefined
+
     if (isEdit.value) {
       await articleStore.updateArticle(editId.value, {
         title: formData.value.title,
         contentMd: formData.value.content,
         categoryId: formData.value.categoryId,
         tags: selectedTagIds,
+        coverImage,
         status: 2, // 修改后重新提交审核
       })
       ElMessage.success('修改已保存，等待重新审核')
@@ -261,6 +287,7 @@ async function handleSubmit() {
       contentMd: formData.value.content,
       categoryId: formData.value.categoryId,
       tags: selectedTagIds,
+      coverImage,
       status: 2, // 提交审核
     })
 
@@ -285,6 +312,7 @@ function handleReset() {
     categoryId: undefined,
     tags: [],
     content: '',
+    coverImage: '',
   }
 }
 
@@ -343,6 +371,23 @@ function handleLogin() {
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   overflow: hidden;
+}
+
+.cover-field {
+  width: 100%;
+}
+
+.cover-preview {
+  margin-top: 8px;
+}
+
+.cover-preview img {
+  width: 160px;
+  height: 90px;
+  object-fit: cover;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  display: block;
 }
 
 :deep(.md-editor) {
