@@ -245,14 +245,18 @@ function formatDate(dateString: string): string {
   align-items: start;
 }
 
-/* 显式列定位：操作栏/作者栏未渲染（加载中）时正文列不漂移 */
+/* 显式定位到第 1 行同一列宽：Grid 稀疏放置规则是「列号比光标小就换行」，
+   正文（第 2 列）在 DOM 里排第一，不锁行的话左栏（第 1 列）会被挤到第 2 行、
+   整体掉到文章下面。三栏必须同时锁定 grid-row: 1 才同行平齐。 */
 .detail-main {
   grid-column: 2;
+  grid-row: 1;
   min-width: 0; /* 防止 markdown 宽内容撑破网格 */
 }
 
 .author-sidebar {
   grid-column: 3;
+  grid-row: 1;
   position: sticky;
   top: 90px;
 }
@@ -261,6 +265,7 @@ function formatDate(dateString: string): string {
 
 .action-bar {
   grid-column: 1;
+  grid-row: 1;
   position: sticky;
   top: 90px;
   display: flex;
@@ -599,11 +604,12 @@ article {
     grid-template-columns: 1fr;
   }
 
-  /* 单列后必须回到第 1 列，否则显式列号会撑出隐式列 */
+  /* 单列后必须回到第 1 列并解除行锁定，否则显式列/行号会撑出隐式格或互相重叠 */
   .detail-main,
   .action-bar,
   .author-sidebar {
     grid-column: 1;
+    grid-row: auto;
   }
 
   .author-sidebar {
