@@ -19,8 +19,8 @@
         </div>
       </div>
 
-      <!-- 编辑区域占满整页余下空间 -->
-      <div class="editor-area">
+      <!-- 编辑区域占满整页余下空间；capture 拦截粘贴，富文本转 Markdown -->
+      <div class="editor-area" @paste.capture="handlePaste">
         <MDEditor
           v-model="formData.content"
           preview="edit"
@@ -420,6 +420,147 @@ async function handleConfirm() {
   } finally {
     publishing.value = false
   }
+}
+
+// ---- 粘贴富文本 → Markdown ----
+// 从 DeepSeek 等页面复制「渲染后」的文字时，text/plain 里没有 #/** 等标记（格式丢失），
+// 但 text/html 里结构还在。这里拦截粘贴，把 HTML 转成 Markdown 插入编辑器。
+
+/** 粘贴事件：编辑器内 textarea 专属，其余走默认行为 */
+function handlePaste(e: ClipboardEvent) {
+  const target = e.target as HTMLElement | null
+  if (!target || target.tagName !== 'TEXTAREA') return
+
+  const clipboard = e.clipboardData
+  if (!clipboard) return
+  const html = clipboard.getData('text/html')
+  if (!html) return // 纯文本粘贴（含 DeepSeek 复制按钮复制的 Markdown 源码）走默认
+
+  const plain = clipboard.getData('text/plain')
+  // 剪贴板纯文本本身已是 Markdown（如复制代码块里的源码）→ 原样粘贴，不要二次转换
+  if (/^#{1,6}\s|^\s*[-*]\s|^\s*\d+\.\s|\*\*|```/m.test(plain)) return
+
+  // 没有结构化标签的 HTML 不值得转换
+  if (!/<(h[1-6]|strong|b|em|i|del|s|ul|ol|li|pre|blockquote|table|a)\b/i.test(html)) return
+
+  e.preventDefault()
+  const md = htmlToMarkdown(html)
+  if (!md) return
+
+  const textarea = target as HTMLTextAreaElement
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  const before = textarea.value.slice(0, start)
+  const after = textarea.value.slice(end)
+  // 块级 Markdown 插到行中间时补空行，避免和上下文黏成一段
+  const insert = `${before && !before.endsWith('\n') ? '\n\n' : ''}${md}${after && !after.startsWith('\n') ? '\n' : ''}`
+
+  textarea.value = before + insert + after
+  textarea.selectionStart = textarea.selectionEnd = start + insert.length
+  // 触发 md-editor 的 v-model（它监听 textarea 的 input 事件）
+  textarea.dispatchEvent(new Event('input', { bubbles: true }))
+  ElMessage.success('已识别富文本并转换为 Markdown 格式')
+}
+
+/** 剪贴板 HTML → Markdown（覆盖 DeepSeek 常渲染的标签） */
+function htmlToMarkdown(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  return renderMdChildren(doc.body)
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function renderMdChildren(node: Node): string {
+  let out = ''
+  node.childNodes.forEach((child) => {
+    out += renderMdNode(child)
+  })
+  return out
+}
+
+function renderMdNode(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) {
+    // 行内空白折叠成单个空格；块级标签自带 \n\n 分隔
+    return (node.textContent || '').replace(/\s+/g, ' ')
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) return ''
+
+  const el = node as HTMLElement
+  const tag = el.tagName.toLowerCase()
+  const inner = renderMdChildren(el).trim()
+
+  switch (tag) {
+    case 'h1': case 'h2': case 'h3': case 'h4': case 'h5': case 'h6':
+      return `\n\n${'#'.repeat(Number(tag[1]))} ${inner}\n\n`
+    case 'p': case 'div': case 'section': case 'article': case 'figure':
+      return `\n\n${inner}\n\n`
+    case 'strong': case 'b':
+      return inner ? `**${inner}**` : ''
+    case 'em': case 'i':
+      return inner ? `*${inner}*` : ''
+    case 'del': case 's': case 'strike':
+      return inner ? `~~${inner}~~` : ''
+    case 'code':
+      // pre 里的 code 由 pre 分支处理，这里是行内代码
+      return el.parentElement?.tagName.toLowerCase() === 'pre'
+        ? (el.textContent ?? '')
+        : `\`${el.textContent?.trim() ?? ''}\``
+    case 'pre': {
+      const codeEl = el.querySelector('code')
+      const lang =
+        (codeEl?.className || el.className || '').match(/language-([\w-]+)/)?.[1] ?? ''
+      const body = (codeEl ?? el).textContent ?? ''
+      return `\n\n\`\`\`${lang}\n${body.replace(/\n+$/, '')}\n\`\`\`\n\n`
+    }
+    case 'a': {
+      const href = el.getAttribute('href') || ''
+      return href ? `[${inner}](${href})` : inner
+    }
+    case 'br':
+      return '\n'
+    case 'hr':
+      return '\n\n---\n\n'
+    case 'blockquote':
+      return `\n\n${inner.split('\n').map((line) => `> ${line}`).join('\n')}\n\n`
+    case 'ul':
+    case 'ol': {
+      const ordered = tag === 'ol'
+      const items = Array.from(el.children).filter(
+        (c) => c.tagName.toLowerCase() === 'li'
+      )
+      const lines = items.map((li, i) => {
+        const content = renderMdChildren(li).trim().replace(/\n+/g, '\n  ')
+        return `${ordered ? `${i + 1}.` : '-'} ${content}`
+      })
+      return lines.length ? `\n\n${lines.join('\n')}\n\n` : ''
+    }
+    case 'li':
+      return renderMdChildren(el)
+    case 'table':
+      return renderMdTable(el)
+    case 'style': case 'script': case 'meta': case 'link': case 'title':
+      return ''
+    default:
+      return inner || (el.textContent ?? '')
+  }
+}
+
+/** 简易表格：首行当表头 */
+function renderMdTable(table: HTMLElement): string {
+  const rows = Array.from(table.querySelectorAll('tr'))
+  if (!rows.length) return ''
+  const lines: string[] = []
+  rows.forEach((tr, rowIndex) => {
+    const cells = Array.from(tr.children).map(
+      (cell) => (cell.textContent || '').trim().replace(/\|/g, '\\|')
+    )
+    lines.push(`| ${cells.join(' | ')} |`)
+    if (rowIndex === 0) {
+      lines.push(`| ${cells.map(() => '---').join(' | ')} |`)
+    }
+  })
+  return `\n\n${lines.join('\n')}\n\n`
 }
 
 function handleReset() {
