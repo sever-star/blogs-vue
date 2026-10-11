@@ -1,7 +1,46 @@
 <template>
-  <main class="article-detail">
+  <main class="article-detail" :class="{ 'with-drawer': commentOpen }">
     <div class="detail-container">
-      <!-- 左栏：文章 -->
+      <!-- 顶部信息条：作者在左、操作按钮在右，与文章同宽平齐；滚动时吸顶不动 -->
+      <div v-if="articleStore.currentArticle" class="top-bar">
+        <div class="top-author">
+          <el-avatar :size="36" :src="articleStore.currentArticle.authorAvatar || undefined">
+            {{ (articleStore.currentArticle.authorNickname || '?').charAt(0) }}
+          </el-avatar>
+          <span class="top-author-name">{{ articleStore.currentArticle.authorNickname }}</span>
+          <span class="top-author-label">文章作者</span>
+          <el-tag v-if="isAuthor" type="primary" size="small" effect="light">我的文章</el-tag>
+        </div>
+        <div class="top-actions">
+          <button
+            type="button"
+            class="action-item"
+            :class="{ 'is-favorited': isFavorited }"
+            @click="handleFavorite"
+          >
+            <el-icon><Collection /></el-icon>
+            <span class="action-label">收藏</span>
+            <span class="action-count">{{ articleStore.currentArticle.favCount ?? 0 }}</span>
+          </button>
+          <button type="button" class="action-item" @click="handleLike">
+            <el-icon><Star /></el-icon>
+            <span class="action-label">点赞</span>
+            <span class="action-count">{{ articleStore.currentArticle.likeCount ?? 0 }}</span>
+          </button>
+          <button
+            type="button"
+            class="action-item"
+            :class="{ 'is-comment': commentOpen }"
+            @click="commentOpen = !commentOpen"
+          >
+            <el-icon><ChatDotRound /></el-icon>
+            <span class="action-label">评论</span>
+            <span class="action-count">{{ articleStore.currentArticle.commentCount ?? 0 }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 文章 -->
       <div class="detail-main">
         <!-- 加载状态 -->
         <div v-if="articleStore.loading && !articleStore.currentArticle" class="loading">
@@ -65,56 +104,9 @@
 
         </article>
       </div>
-
-      <!-- 左侧操作栏：点赞 / 收藏 / 评论 平铺（窄屏落到文章下方横排） -->
-      <div v-if="articleStore.currentArticle" class="action-bar">
-        <button
-          type="button"
-          class="action-item"
-          :class="{ 'is-favorited': isFavorited }"
-          @click="handleFavorite"
-        >
-          <el-icon><Collection /></el-icon>
-          <span class="action-count">{{ articleStore.currentArticle.favCount ?? 0 }}</span>
-          <span class="action-label">收藏</span>
-        </button>
-        <button type="button" class="action-item" @click="handleLike">
-          <el-icon><Star /></el-icon>
-          <span class="action-count">{{ articleStore.currentArticle.likeCount ?? 0 }}</span>
-          <span class="action-label">点赞</span>
-        </button>
-        <button
-          type="button"
-          class="action-item"
-          :class="{ 'is-comment': commentOpen }"
-          @click="commentOpen = !commentOpen"
-        >
-          <el-icon><ChatDotRound /></el-icon>
-          <span class="action-count">{{ articleStore.currentArticle.commentCount ?? 0 }}</span>
-          <span class="action-label">评论</span>
-        </button>
-      </div>
-
-      <!-- 右栏：作者信息（文章加载完成后展示，窄屏落到文章下方） -->
-      <aside v-if="articleStore.currentArticle" class="author-sidebar">
-        <el-card shadow="never" class="author-card">
-          <div class="author-block">
-            <el-avatar :size="56" :src="articleStore.currentArticle.authorAvatar || undefined">
-              {{ (articleStore.currentArticle.authorNickname || '?').charAt(0) }}
-            </el-avatar>
-            <div class="author-meta">
-              <span class="author-nickname">{{ articleStore.currentArticle.authorNickname }}</span>
-              <span class="author-label">文章作者</span>
-            </div>
-          </div>
-          <el-tag v-if="isAuthor" type="primary" size="small" effect="light">
-            我的文章
-          </el-tag>
-        </el-card>
-      </aside>
     </div>
 
-    <!-- 右侧评论弹窗：贴视口右缘，宽 320px——≥1200px 视口下正好覆盖作者栏区域，不遮正文 -->
+    <!-- 右侧评论弹窗：贴视口右缘，宽 320px；打开时正文整体左移让位，不遮文章 -->
     <transition name="comment-drawer">
       <aside v-if="commentOpen && articleStore.currentArticle" class="comment-drawer">
         <div class="comment-drawer-header">
@@ -233,55 +225,84 @@ function formatDate(dateString: string): string {
   min-height: calc(100vh - 70px);
   background-color: #f5f5f5;
   padding: 20px 0;
+  transition: padding-right 0.25s ease;
+}
+
+/* 评论弹窗打开时正文整体左移让位（弹窗固定占右侧 340px），不遮文章主体 */
+.article-detail.with-drawer {
+  padding-right: 340px;
 }
 
 .detail-container {
-  max-width: 1200px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 0 20px;
-  display: grid;
-  grid-template-columns: 56px 1fr 300px; /* 操作栏 | 正文 | 作者栏 */
-  gap: 20px;
-  align-items: start;
-}
-
-/* 显式列定位：操作栏/作者栏未渲染（加载中）时正文列不漂移 */
-.detail-main {
-  grid-column: 2;
-  min-width: 0; /* 防止 markdown 宽内容撑破网格 */
-}
-
-.author-sidebar {
-  grid-column: 3;
-  position: sticky;
-  top: 90px;
-}
-
-/* ---- 左侧操作栏 ---- */
-
-.action-bar {
-  grid-column: 1;
-  position: sticky;
-  top: 90px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  align-items: center;
 }
 
-.action-item {
-  width: 52px;
-  padding: 10px 0 8px;
+.detail-main {
+  min-width: 0; /* 防止 markdown 宽内容撑破网格 */
+}
+
+/* ---- 顶部信息条：作者在左、操作按钮在右，与文章同宽平齐，吸顶不动 ---- */
+
+.top-bar {
+  position: sticky;
+  top: 70px;
+  z-index: 100;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  padding: 10px 16px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.top-author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.top-author-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-author-label {
+  font-size: 12px;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.top-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ---- 操作按钮（顶部横排胶囊） ---- */
+
+.action-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: 18px;
   cursor: pointer;
   color: #4b5563;
-  font-size: 20px;
+  font-size: 14px;
   transition: all 0.2s;
 }
 
@@ -292,15 +313,15 @@ function formatDate(dateString: string): string {
 }
 
 .action-count {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #1f2937;
   line-height: 1.2;
 }
 
 .action-label {
-  font-size: 11px;
-  color: #9ca3af;
+  font-size: 13px;
+  color: #6b7280;
   line-height: 1.2;
 }
 
@@ -380,40 +401,6 @@ function formatDate(dateString: string): string {
 .comment-drawer-leave-to {
   transform: translateX(100%);
   opacity: 0;
-}
-
-.author-card {
-  border-radius: 8px;
-  border: none;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.author-block {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.author-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.author-nickname {
-  font-size: 15px;
-  font-weight: 600;
-  color: #1f2937;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.author-label {
-  font-size: 12px;
-  color: #9ca3af;
 }
 
 .loading {
@@ -593,37 +580,28 @@ article {
   font-weight: 600;
 }
 
-/* 窄屏收起三栏：正文占满，操作栏变为横排落在文章下方，作者卡片最后 */
-@media (max-width: 1024px) {
-  .detail-container {
-    grid-template-columns: 1fr;
-  }
-
-  /* 单列后必须回到第 1 列，否则显式列号会撑出隐式列 */
-  .detail-main,
-  .action-bar,
-  .author-sidebar {
-    grid-column: 1;
-  }
-
-  .author-sidebar {
-    position: static;
-  }
-
-  .action-bar {
-    position: static;
-    flex-direction: row;
-    justify-content: center;
-  }
-}
-
 @media (max-width: 768px) {
   .detail-container {
     padding: 0 12px;
   }
 
+  /* 窄屏顶部条换行：作者居中一行，操作按钮另起一行居中 */
+  .top-bar {
+    justify-content: center;
+  }
+
+  .top-author {
+    width: 100%;
+    justify-content: center;
+  }
+
   .comment-drawer {
     width: min(320px, 85vw);
+  }
+
+  /* 手机上弹窗直接覆盖，不再挤占正文宽度 */
+  .article-detail.with-drawer {
+    padding-right: 0;
   }
 
   .article-header {
