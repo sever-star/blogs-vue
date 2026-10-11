@@ -1,14 +1,6 @@
 <template>
   <main class="article-detail">
     <div class="detail-container">
-      <!-- 返回按钮独占整行：下方正文与作者卡片从同一起跑线开始，顶边对齐 -->
-      <div class="back-button">
-        <el-button link @click="handleBack">
-          <el-icon><ArrowLeft /></el-icon>
-          返回
-        </el-button>
-      </div>
-
       <!-- 左栏：文章 -->
       <div class="detail-main">
         <!-- 加载状态 -->
@@ -125,7 +117,7 @@ import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 import { MdPreview as MDPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
-import { Star, ChatDotRound, User, Calendar, View, ArrowLeft, Edit, Collection } from '@element-plus/icons-vue'
+import { Star, ChatDotRound, User, Calendar, View, Edit, Collection } from '@element-plus/icons-vue'
 import CommentSection from '@/components/CommentSection.vue'
 
 const route = useRoute()
@@ -202,10 +194,6 @@ function handleEdit() {
   router.push(`/write/${articleId.value}`)
 }
 
-function handleBack() {
-  router.back()
-}
-
 function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('zh-CN', {
     year: 'numeric',
@@ -276,11 +264,6 @@ function formatDate(dateString: string): string {
 .author-label {
   font-size: 12px;
   color: #9ca3af;
-}
-
-.back-button {
-  grid-column: 1 / -1;
-  margin-bottom: 16px;
 }
 
 .loading {
