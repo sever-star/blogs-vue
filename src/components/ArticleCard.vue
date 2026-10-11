@@ -45,7 +45,12 @@
         <span class="stat-label">浏览</span>
       </div>
       <div class="stat-item">
-        <el-icon><Star /></el-icon>
+        <!-- 与详情页点赞一致的大拇指（Element Plus 无此图标，内联 SVG 走 currentColor） -->
+        <svg class="thumb-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path
+            d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"
+          />
+        </svg>
         <span class="stat-value">{{ article.likeCount }}</span>
         <span class="stat-label">点赞</span>
       </div>
@@ -67,7 +72,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Article } from '@/stores/article'
-import { Calendar, User, View, Star, ChatDotRound } from '@element-plus/icons-vue'
+import { Calendar, User, View, ChatDotRound } from '@element-plus/icons-vue'
 
 const props = defineProps<{
   article: Article
@@ -209,6 +214,12 @@ function formatDate(dateString: string): string {
   gap: 4px;
   font-size: 12px;
   color: #999;
+}
+
+/* 大拇指点赞图标：尺寸跟随所在容器 font-size，颜色走 currentColor */
+.thumb-icon {
+  width: 1em;
+  height: 1em;
 }
 
 .stat-value {
