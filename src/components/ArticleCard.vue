@@ -1,9 +1,10 @@
 <template>
   <div class="article-card">
     <div class="card-content">
-      <router-link :to="`/article/${article.id}`" class="title-link">
+      <!-- 新标签页打开：普通 a + target=_blank（router-link 会拦截成当前页路由跳转） -->
+      <a :href="articleHref" target="_blank" rel="noopener" class="title-link">
         <h2 class="article-title">{{ article.title }}</h2>
-      </router-link>
+      </a>
 
       <p class="article-excerpt">{{ article.summary }}</p>
 
@@ -58,16 +59,25 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { Article } from '@/stores/article'
 import { Calendar, User, View, Star, ChatDotRound } from '@element-plus/icons-vue'
 
-defineProps<{
+const props = defineProps<{
   article: Article
 }>()
 
 defineEmits<{
   'tag-click': [tag: string]
 }>()
+
+const router = useRouter()
+
+// resolve().href 自带路由 base（部署在 /proxy/xxx 下时写死 /article/ 会 404）
+const articleHref = computed(
+  () => router.resolve({ name: 'ArticleDetail', params: { id: props.article.id } }).href
+)
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString)
