@@ -2046,6 +2046,46 @@ Content-Type: multipart/form-data
 
 ---
 
+### 2. 上传文章封面图片
+
+**请求**
+
+```
+POST /upload/cover
+Authorization: Bearer {accessToken}
+Content-Type: multipart/form-data
+```
+
+**入参（multipart 字段）**
+| 字段 | 类型 | 必需 | 说明 |
+|-----|------|------|------|
+| file | file | 是 | 图片文件，支持 jpg/jpeg/png/gif/webp/bmp，建议 ≤ 2MB（前端另限制 ≤ 5MB） |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "url": "https://{bucket}.oss-{region}.aliyuncs.com/cover/2026/10/11/uuid.png"
+  }
+}
+```
+
+**错误情况**
+
+- 401: 未登录 / accessToken 无效
+- 400: 文件为空、格式不支持、超过大小限制
+
+**备注**
+
+- 与头像上传同构，文件存 OSS 的 `cover` 目录；返回的 `url` 由前端写入 `coverImage`，随 `POST /posts` / `PUT /posts/{id}` 提交
+- 写文章页交互：点击上传框选择本地图片 → **选中即调本接口**上传 → 拿到 URL 显示预览；点 × 移除仅清空前端值（编辑提交时以空串覆盖后端 `cover_image`）
+- `SecurityConfig` 中该路径落到 `anyRequest().authenticated()`，普通登录用户即可调用
+
+---
+
 ## AI 助手接口
 
 AI 对话模块采用「后端代理」模式：前端不直连大模型，而是把提问发给后端，由后端组装上下文、调用 DeepSeek（OpenAI 兼容协议）并以 SSE 流式转发结果。模块**对游客开放**——会话按客户端 IP 归属（登录用户按 user_id 归属），因此无需认证，成本控制靠后端按 IP 的限流实现。

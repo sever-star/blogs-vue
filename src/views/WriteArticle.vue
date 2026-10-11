@@ -63,17 +63,35 @@
             </el-select>
           </el-form-item>
 
-          <!-- 文章封面（可选）：后端 cover_image 存 URL，留空则列表不展示封面 -->
+          <!-- 文章封面（可选）：点击选择本地图片，选中即上传 OSS，URL 随文章提交 -->
           <el-form-item label="文章封面">
             <div class="cover-field">
-              <el-input
-                v-model="formData.coverImage"
-                placeholder="封面图片 URL（可选，需以 http:// 或 https:// 开头）"
-                clearable
-              />
-              <div v-if="formData.coverImage.trim()" class="cover-preview">
-                <img :src="formData.coverImage.trim()" alt="封面预览" />
-              </div>
+              <el-upload
+                class="cover-uploader"
+                :auto-upload="false"
+                :show-file-list="false"
+                accept="image/*"
+                :disabled="coverUploading"
+                :on-change="handleCoverSelect"
+              >
+                <div class="cover-box" :class="{ 'is-empty': !formData.coverImage }">
+                  <el-icon v-if="coverUploading" class="is-loading"><Loading /></el-icon>
+                  <span v-else-if="!formData.coverImage" class="cover-prompt">点击选择本地图片</span>
+                  <img v-else :src="formData.coverImage" alt="封面预览" />
+                  <button
+                    v-if="formData.coverImage && !coverUploading"
+                    type="button"
+                    class="cover-remove"
+                    title="移除封面"
+                    @click.stop="handleCoverRemove"
+                  >
+                    ×
+                  </button>
+                </div>
+              </el-upload>
+              <p v-if="!formData.coverImage" class="cover-hint">
+                可选；选中后立即上传，封面 URL 随文章一起提交
+              </p>
             </div>
           </el-form-item>
 
@@ -115,7 +133,10 @@ import { useArticleStore } from '@/stores/article'
 import { useAuthStore } from '@/stores/auth'
 import { useCategoryStore } from '@/stores/category'
 import { createTag } from '@/api/tag'
+import { uploadCover } from '@/api/upload'
 import { ElMessage } from 'element-plus'
+import type { UploadFile } from 'element-plus'
+import { Loading } from '@element-plus/icons-vue'
 import { MdEditor as MDEditor } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
 
@@ -143,6 +164,44 @@ const formData = ref({
 })
 
 const availableTags = computed(() => articleStore.tags.map((tag) => tag.name))
+
+// ---- 封面上传 ----
+
+const coverUploading = ref(false)
+
+/** 选中本地封面：立即上传 OSS，拿到 URL 写入表单，提交时随 coverImage 一起保存 */
+async function handleCoverSelect(file: UploadFile) {
+  const raw = file.raw
+  if (!raw || coverUploading.value) return
+  if (!raw.type.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件')
+    return
+  }
+  if (raw.size > 5 * 1024 * 1024) {
+    ElMessage.warning('封面图片不能超过 5MB')
+    return
+  }
+
+  coverUploading.value = true
+  try {
+    const { url } = await uploadCover(raw)
+    formData.value.coverImage = url
+  } catch (error) {
+    console.error('封面上传失败:', error)
+    const message =
+      error && typeof error === 'object' && 'message' in error
+        ? String((error as { message?: unknown }).message ?? '')
+        : ''
+    ElMessage.error(message || '封面上传失败，请重试')
+  } finally {
+    coverUploading.value = false
+  }
+}
+
+/** 移除封面：编辑时以空串提交（后端收到非 null 才覆盖），创建时不传字段 */
+function handleCoverRemove() {
+  formData.value.coverImage = ''
+}
 
 // 本次会话内新建标签的名称→id 缓存（allow-create 输入的标签尚未存在于标签列表中）
 const createdTagCache = new Map<string, number>()
@@ -265,16 +324,14 @@ async function handleSubmit() {
       return
     }
 
-    // 留空时不传该字段：更新接口只在收到非 null 的 coverImage 时才覆盖，避免误清已有封面
-    const coverImage = formData.value.coverImage.trim() || undefined
-
     if (isEdit.value) {
       await articleStore.updateArticle(editId.value, {
         title: formData.value.title,
         contentMd: formData.value.content,
         categoryId: formData.value.categoryId,
         tags: selectedTagIds,
-        coverImage,
+        // 编辑时始终带当前值：空串表示用户移除了封面（后端收到非 null 才覆盖）
+        coverImage: formData.value.coverImage.trim(),
         status: 2, // 修改后重新提交审核
       })
       ElMessage.success('修改已保存，等待重新审核')
@@ -287,7 +344,8 @@ async function handleSubmit() {
       contentMd: formData.value.content,
       categoryId: formData.value.categoryId,
       tags: selectedTagIds,
-      coverImage,
+      // 创建时留空不传字段，cover_image 保持 NULL 而非空串
+      coverImage: formData.value.coverImage.trim() || undefined,
       status: 2, // 提交审核
     })
 
@@ -377,17 +435,69 @@ function handleLogin() {
   width: 100%;
 }
 
-.cover-preview {
-  margin-top: 8px;
+.cover-uploader {
+  width: 100%;
 }
 
-.cover-preview img {
-  width: 160px;
-  height: 90px;
-  object-fit: cover;
-  border: 1px solid #e5e7eb;
+/* 点击选择本地文件的上传区 */
+.cover-box {
+  position: relative;
+  width: 240px;
+  height: 135px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #dcdfe6;
   border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.cover-box:hover {
+  border-color: #409eff;
+}
+
+.cover-box.is-empty {
+  background: #fafafa;
+}
+
+.cover-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   display: block;
+}
+
+.cover-prompt {
+  color: #909399;
+  font-size: 13px;
+}
+
+.cover-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cover-remove:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.cover-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #909399;
 }
 
 :deep(.md-editor) {

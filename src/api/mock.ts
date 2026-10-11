@@ -309,6 +309,11 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     return ok({ url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}` })
   },
 
+  // 上传文章封面（模拟 OSS 中转，返回随机占位图 URL）
+  [R('POST', /^\/upload\/cover$/)]: () => {
+    return ok({ url: `https://picsum.photos/seed/cover${Date.now()}/800/400` })
+  },
+
   // ---- 分类 ----
   // 全量分类（选择器用，支持可选 keyword 模糊过滤）
   [R('GET', /^\/categories$/)]: (_, __, params) => {

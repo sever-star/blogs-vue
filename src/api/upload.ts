@@ -24,3 +24,19 @@ export const uploadAvatar = async (file: File): Promise<AvatarUploadResult> => {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }
+
+/**
+ * 上传文章封面图片到 OSS（后端中转）
+ * POST /upload/cover
+ * Content-Type: multipart/form-data，字段名 `file`
+ *
+ * 写文章页选中本地文件后立即调用，拿到公开 URL 再随
+ * POST /posts / PUT /posts/{id} 的 coverImage 字段提交。
+ */
+export const uploadCover = async (file: File): Promise<AvatarUploadResult> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return client.post('/upload/cover', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
