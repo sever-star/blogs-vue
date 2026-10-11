@@ -74,12 +74,20 @@
           :class="{ 'is-favorited': isFavorited }"
           @click="handleFavorite"
         >
-          <el-icon><Collection /></el-icon>
+          <el-icon>
+            <StarFilled v-if="isFavorited" />
+            <Star v-else />
+          </el-icon>
           <span class="action-count">{{ articleStore.currentArticle.favCount ?? 0 }}</span>
           <span class="action-label">收藏</span>
         </button>
         <button type="button" class="action-item" @click="handleLike">
-          <el-icon><Star /></el-icon>
+          <!-- Element Plus 图标库无大拇指，用内联 SVG（fill=currentColor 跟随按钮悬停/高亮变色） -->
+          <svg class="thumb-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path
+              d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"
+            />
+          </svg>
           <span class="action-count">{{ articleStore.currentArticle.likeCount ?? 0 }}</span>
           <span class="action-label">点赞</span>
         </button>
@@ -139,7 +147,7 @@ import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 import { MdPreview as MDPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
-import { Star, ChatDotRound, User, Calendar, View, Edit, Collection, Close } from '@element-plus/icons-vue'
+import { Star, StarFilled, ChatDotRound, User, Calendar, View, Edit, Close } from '@element-plus/icons-vue'
 import CommentSection from '@/components/CommentSection.vue'
 
 const route = useRoute()
@@ -288,6 +296,12 @@ function formatDate(dateString: string): string {
   color: #4b5563;
   font-size: 20px;
   transition: all 0.2s;
+}
+
+/* 大拇指点赞图标：尺寸跟随按钮 font-size（1em），颜色走 currentColor */
+.thumb-icon {
+  width: 1em;
+  height: 1em;
 }
 
 .action-item:hover {
