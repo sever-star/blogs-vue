@@ -1,97 +1,118 @@
 <template>
   <main class="article-detail">
     <div class="detail-container">
-      <!-- 返回按钮 -->
-      <div class="back-button">
-        <el-button link @click="handleBack">
-          <el-icon><ArrowLeft /></el-icon>
-          返回
-        </el-button>
-      </div>
-
-      <!-- 加载状态 -->
-      <div v-if="articleStore.loading && !articleStore.currentArticle" class="loading">
-        <el-skeleton :rows="5" animated />
-      </div>
-
-      <!-- 文章不存在 -->
-      <div v-else-if="!articleStore.currentArticle" class="not-found">
-        <el-empty description="文章不存在" />
-      </div>
-
-      <!-- 文章内容 -->
-      <article v-else>
-        <!-- 文章头部 -->
-        <header class="article-header">
-          <div class="title-row">
-            <h1 class="article-title">{{ articleStore.currentArticle.title }}</h1>
-            <el-button v-if="isAuthor" type="primary" plain size="small" class="edit-btn" @click="handleEdit">
-              <el-icon><Edit /></el-icon>
-              编辑文章
-            </el-button>
-          </div>
-
-          <div class="article-info">
-            <span class="author">
-              <el-icon><User /></el-icon>
-              {{ articleStore.currentArticle.authorNickname }}
-              <el-tag v-if="isAuthor" type="primary" size="small" effect="light" class="author-badge">
-                我的文章
-              </el-tag>
-            </span>
-            <span class="publish-time">
-              <el-icon><Calendar /></el-icon>
-              {{ formatDate(articleStore.currentArticle.createdAt) }}
-            </span>
-            <span class="views">
-              <el-icon><View /></el-icon>
-              {{ articleStore.currentArticle.viewCount }} 次浏览
-            </span>
-          </div>
-
-          <!-- 文章标签 -->
-          <div class="article-tags">
-            <el-tag
-              v-for="tag in articleStore.currentArticle.tags"
-              :key="tag.id"
-              type="info"
-              effect="plain"
-              class="tag"
-            >
-              {{ tag.name }}
-            </el-tag>
-          </div>
-        </header>
-
-        <!-- 文章正文 -->
-        <div class="article-content markdown-body">
-          <!-- MdPreview 只认 modelValue，:text 不是合法 prop（会被忽略导致正文空白） -->
-          <MDPreview :model-value="articleStore.currentArticle.contentMd" preview-only />
+      <!-- 左栏：返回按钮 + 文章 -->
+      <div class="detail-main">
+        <!-- 返回按钮 -->
+        <div class="back-button">
+          <el-button link @click="handleBack">
+            <el-icon><ArrowLeft /></el-icon>
+            返回
+          </el-button>
         </div>
 
-        <!-- 文章底部操作 -->
-        <footer class="article-footer">
-          <div class="article-actions">
-            <el-button-group>
-              <el-button @click="handleLike" type="primary">
-                <el-icon><Star /></el-icon>
-                点赞 ({{ articleStore.currentArticle.likeCount }})
-              </el-button>
-              <el-button @click="handleFavorite" :type="isFavorited ? 'warning' : ''">
-                <el-icon><Collection /></el-icon>
-                {{ isFavorited ? '已收藏' : '收藏' }} ({{ articleStore.currentArticle.favCount }})
-              </el-button>
-              <el-button>
-                <el-icon><ChatDotRound /></el-icon>
-                评论 ({{ articleStore.currentArticle.commentCount }})
-              </el-button>
-            </el-button-group>
-          </div>
-        </footer>
+        <!-- 加载状态 -->
+        <div v-if="articleStore.loading && !articleStore.currentArticle" class="loading">
+          <el-skeleton :rows="5" animated />
+        </div>
 
-        <!-- 评论区 -->
-        <CommentSection :article-id="articleId" />
-      </article>
+        <!-- 文章不存在 -->
+        <div v-else-if="!articleStore.currentArticle" class="not-found">
+          <el-empty description="文章不存在" />
+        </div>
+
+        <!-- 文章内容 -->
+        <article v-else>
+          <!-- 文章头部 -->
+          <header class="article-header">
+            <div class="title-row">
+              <h1 class="article-title">{{ articleStore.currentArticle.title }}</h1>
+              <el-button v-if="isAuthor" type="primary" plain size="small" class="edit-btn" @click="handleEdit">
+                <el-icon><Edit /></el-icon>
+                编辑文章
+              </el-button>
+            </div>
+
+            <div class="article-info">
+              <span class="author">
+                <el-icon><User /></el-icon>
+                {{ articleStore.currentArticle.authorNickname }}
+                <el-tag v-if="isAuthor" type="primary" size="small" effect="light" class="author-badge">
+                  我的文章
+                </el-tag>
+              </span>
+              <span class="publish-time">
+                <el-icon><Calendar /></el-icon>
+                {{ formatDate(articleStore.currentArticle.createdAt) }}
+              </span>
+              <span class="views">
+                <el-icon><View /></el-icon>
+                {{ articleStore.currentArticle.viewCount }} 次浏览
+              </span>
+            </div>
+
+            <!-- 文章标签 -->
+            <div class="article-tags">
+              <el-tag
+                v-for="tag in articleStore.currentArticle.tags"
+                :key="tag.id"
+                type="info"
+                effect="plain"
+                class="tag"
+              >
+                {{ tag.name }}
+              </el-tag>
+            </div>
+          </header>
+
+          <!-- 文章正文 -->
+          <div class="article-content markdown-body">
+            <!-- MdPreview 只认 modelValue，:text 不是合法 prop（会被忽略导致正文空白） -->
+            <MDPreview :model-value="articleStore.currentArticle.contentMd" preview-only />
+          </div>
+
+          <!-- 文章底部操作 -->
+          <footer class="article-footer">
+            <div class="article-actions">
+              <el-button-group>
+                <el-button @click="handleLike" type="primary">
+                  <el-icon><Star /></el-icon>
+                  点赞 ({{ articleStore.currentArticle.likeCount }})
+                </el-button>
+                <el-button @click="handleFavorite" :type="isFavorited ? 'warning' : ''">
+                  <el-icon><Collection /></el-icon>
+                  {{ isFavorited ? '已收藏' : '收藏' }} ({{ articleStore.currentArticle.favCount }})
+                </el-button>
+                <el-button>
+                  <el-icon><ChatDotRound /></el-icon>
+                  评论 ({{ articleStore.currentArticle.commentCount }})
+                </el-button>
+              </el-button-group>
+            </div>
+          </footer>
+
+          <!-- 评论区 -->
+          <CommentSection :article-id="articleId" />
+        </article>
+      </div>
+
+      <!-- 右栏：作者信息（文章加载完成后展示，窄屏落到文章下方） -->
+      <aside v-if="articleStore.currentArticle" class="author-sidebar">
+        <el-card shadow="never" class="author-card">
+          <div class="author-block">
+            <el-avatar :size="56" :src="articleStore.currentArticle.authorAvatar || undefined">
+              {{ (articleStore.currentArticle.authorNickname || '?').charAt(0) }}
+            </el-avatar>
+            <div class="author-meta">
+              <span class="author-nickname">{{ articleStore.currentArticle.authorNickname }}</span>
+              <span class="author-label">文章作者</span>
+            </div>
+          </div>
+          <el-tag v-if="isAuthor" type="primary" size="small" effect="light">
+            我的文章
+          </el-tag>
+        </el-card>
+      </aside>
     </div>
   </main>
 </template>
@@ -202,9 +223,59 @@ function formatDate(dateString: string): string {
 }
 
 .detail-container {
-  max-width: 900px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* 左栏正文，min-width:0 防止 markdown 宽内容撑破网格 */
+.detail-main {
+  min-width: 0;
+}
+
+/* ---- 右栏作者信息 ---- */
+
+.author-sidebar {
+  position: sticky;
+  top: 90px;
+}
+
+.author-card {
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.author-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.author-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.author-nickname {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.author-label {
+  font-size: 12px;
+  color: #9ca3af;
 }
 
 .back-button {
@@ -397,6 +468,17 @@ article {
 .article-actions {
   display: flex;
   justify-content: center;
+}
+
+/* 窄屏收起右栏：作者卡片落到文章下方 */
+@media (max-width: 1024px) {
+  .detail-container {
+    grid-template-columns: 1fr;
+  }
+
+  .author-sidebar {
+    position: static;
+  }
 }
 
 @media (max-width: 768px) {
