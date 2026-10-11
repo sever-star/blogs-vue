@@ -63,29 +63,36 @@
             <MDPreview :model-value="articleStore.currentArticle.contentMd" preview-only />
           </div>
 
-          <!-- 文章底部操作 -->
-          <footer class="article-footer">
-            <div class="article-actions">
-              <el-button-group>
-                <el-button @click="handleLike" type="primary">
-                  <el-icon><Star /></el-icon>
-                  点赞 ({{ articleStore.currentArticle.likeCount }})
-                </el-button>
-                <el-button @click="handleFavorite" :type="isFavorited ? 'warning' : ''">
-                  <el-icon><Collection /></el-icon>
-                  {{ isFavorited ? '已收藏' : '收藏' }} ({{ articleStore.currentArticle.favCount }})
-                </el-button>
-                <el-button>
-                  <el-icon><ChatDotRound /></el-icon>
-                  评论 ({{ articleStore.currentArticle.commentCount }})
-                </el-button>
-              </el-button-group>
-            </div>
-          </footer>
-
-          <!-- 评论区 -->
-          <CommentSection :article-id="articleId" />
         </article>
+      </div>
+
+      <!-- 左侧操作栏：点赞 / 收藏 / 评论 平铺（窄屏落到文章下方横排） -->
+      <div v-if="articleStore.currentArticle" class="action-bar">
+        <button
+          type="button"
+          class="action-item"
+          :class="{ 'is-favorited': isFavorited }"
+          @click="handleFavorite"
+        >
+          <el-icon><Collection /></el-icon>
+          <span class="action-count">{{ articleStore.currentArticle.favCount ?? 0 }}</span>
+          <span class="action-label">收藏</span>
+        </button>
+        <button type="button" class="action-item" @click="handleLike">
+          <el-icon><Star /></el-icon>
+          <span class="action-count">{{ articleStore.currentArticle.likeCount ?? 0 }}</span>
+          <span class="action-label">点赞</span>
+        </button>
+        <button
+          type="button"
+          class="action-item"
+          :class="{ 'is-comment': commentOpen }"
+          @click="commentOpen = !commentOpen"
+        >
+          <el-icon><ChatDotRound /></el-icon>
+          <span class="action-count">{{ articleStore.currentArticle.commentCount ?? 0 }}</span>
+          <span class="action-label">评论</span>
+        </button>
       </div>
 
       <!-- 右栏：作者信息（文章加载完成后展示，窄屏落到文章下方） -->
@@ -106,18 +113,33 @@
         </el-card>
       </aside>
     </div>
+
+    <!-- 右侧评论弹窗：贴视口右缘，宽 320px——≥1200px 视口下正好覆盖作者栏区域，不遮正文 -->
+    <transition name="comment-drawer">
+      <aside v-if="commentOpen && articleStore.currentArticle" class="comment-drawer">
+        <div class="comment-drawer-header">
+          <span class="comment-drawer-title">评论</span>
+          <el-button link @click="commentOpen = false">
+            <el-icon><Close /></el-icon>
+          </el-button>
+        </div>
+        <div class="comment-drawer-body">
+          <CommentSection :article-id="articleId" />
+        </div>
+      </aside>
+    </transition>
   </main>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useArticleStore } from '@/stores/article'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 import { MdPreview as MDPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
-import { Star, ChatDotRound, User, Calendar, View, Edit, Collection } from '@element-plus/icons-vue'
+import { Star, ChatDotRound, User, Calendar, View, Edit, Collection, Close } from '@element-plus/icons-vue'
 import CommentSection from '@/components/CommentSection.vue'
 
 const route = useRoute()
@@ -161,6 +183,9 @@ function handleLike() {
 
 // 是否已收藏：详情接口仅在登录时返回 favorited，游客看到的是未收藏态
 const isFavorited = computed(() => !!articleStore.currentArticle?.favorited)
+
+// 右侧评论弹窗开关（点击左侧操作栏的评论按钮切换）
+const commentOpen = ref(false)
 
 async function handleFavorite() {
   if (!authStore.isLoggedIn) {
@@ -215,21 +240,146 @@ function formatDate(dateString: string): string {
   margin: 0 auto;
   padding: 0 20px;
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: 56px 1fr 300px; /* 操作栏 | 正文 | 作者栏 */
   gap: 20px;
   align-items: start;
 }
 
-/* 左栏正文，min-width:0 防止 markdown 宽内容撑破网格 */
+/* 显式列定位：操作栏/作者栏未渲染（加载中）时正文列不漂移 */
 .detail-main {
-  min-width: 0;
+  grid-column: 2;
+  min-width: 0; /* 防止 markdown 宽内容撑破网格 */
 }
 
-/* ---- 右栏作者信息 ---- */
-
 .author-sidebar {
+  grid-column: 3;
   position: sticky;
   top: 90px;
+}
+
+/* ---- 左侧操作栏 ---- */
+
+.action-bar {
+  grid-column: 1;
+  position: sticky;
+  top: 90px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.action-item {
+  width: 52px;
+  padding: 10px 0 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  color: #4b5563;
+  font-size: 20px;
+  transition: all 0.2s;
+}
+
+.action-item:hover {
+  border-color: #409eff;
+  color: #409eff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+}
+
+.action-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.2;
+}
+
+.action-label {
+  font-size: 11px;
+  color: #9ca3af;
+  line-height: 1.2;
+}
+
+.action-item:hover .action-count,
+.action-item:hover .action-label {
+  color: #409eff;
+}
+
+/* 已收藏：橙色强调 */
+.action-item.is-favorited,
+.action-item.is-favorited .action-count,
+.action-item.is-favorited .action-label {
+  border-color: #e6a23c;
+  background: #fdf6ec;
+  color: #e6a23c;
+}
+
+/* 评论弹窗展开中：蓝色强调 */
+.action-item.is-comment,
+.action-item.is-comment .action-count,
+.action-item.is-comment .action-label {
+  border-color: #409eff;
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+/* ---- 右侧评论弹窗 ---- */
+
+.comment-drawer {
+  position: fixed;
+  top: 70px;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  background: #fff;
+  border-left: 1px solid #e5e7eb;
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+}
+
+.comment-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+
+.comment-drawer-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.comment-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* 评论组件自带白卡样式，放进弹窗后去掉外层卡片感 */
+:deep(.comment-section) {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.comment-drawer-enter-active,
+.comment-drawer-leave-active {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.comment-drawer-enter-from,
+.comment-drawer-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
 }
 
 .author-card {
@@ -443,31 +593,37 @@ article {
   font-weight: 600;
 }
 
-.article-footer {
-  padding: 24px;
-  border-top: 1px solid #e5e7eb;
-  background-color: #f9fafb;
-}
-
-.article-actions {
-  display: flex;
-  justify-content: center;
-}
-
-/* 窄屏收起右栏：作者卡片落到文章下方 */
+/* 窄屏收起三栏：正文占满，操作栏变为横排落在文章下方，作者卡片最后 */
 @media (max-width: 1024px) {
   .detail-container {
     grid-template-columns: 1fr;
   }
 
+  /* 单列后必须回到第 1 列，否则显式列号会撑出隐式列 */
+  .detail-main,
+  .action-bar,
+  .author-sidebar {
+    grid-column: 1;
+  }
+
   .author-sidebar {
     position: static;
+  }
+
+  .action-bar {
+    position: static;
+    flex-direction: row;
+    justify-content: center;
   }
 }
 
 @media (max-width: 768px) {
   .detail-container {
     padding: 0 12px;
+  }
+
+  .comment-drawer {
+    width: min(320px, 85vw);
   }
 
   .article-header {
