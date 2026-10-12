@@ -127,6 +127,8 @@ export interface AuthResponse {
 export interface ArticlePayload {
   title: string
   contentMd: string
+  /** 渲染后的 HTML（编辑器 onHtmlChanged 回调产出），随创建/更新一并提交 */
+  contentHtml?: string
   summary?: string
   coverImage?: string
   categoryId?: number // 分类ID，可选

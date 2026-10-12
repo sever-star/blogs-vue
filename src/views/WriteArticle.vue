@@ -24,6 +24,7 @@
         <MDEditor
           v-model="formData.content"
           preview="edit"
+          :on-html-changed="handleHtmlChanged"
           :plugins="[MDEditorMermaid, MDEditorCodeTheme]"
         />
       </div>
@@ -181,6 +182,13 @@ const formData = ref({
   content: '',
   coverImage: '',
 })
+
+// 编辑器渲染出的 HTML（onHtmlChanged 回调产出），随创建/更新提交给后端存 content_html
+const contentHtml = ref('')
+
+function handleHtmlChanged(html: string) {
+  contentHtml.value = html
+}
 
 const availableTags = computed(() => articleStore.tags.map((tag) => tag.name))
 
@@ -369,6 +377,8 @@ async function handleConfirm() {
       await articleStore.updateArticle(editId.value, {
         title: formData.value.title,
         contentMd: formData.value.content,
+        // 编辑器 onHtmlChanged 产出的渲染结果，后端随正文一起更新 content_html
+        contentHtml: contentHtml.value || undefined,
         categoryId: formData.value.categoryId,
         tags: selectedTagIds,
         // 编辑时始终带当前值：空串表示用户移除了封面（后端收到非 null 才覆盖）
@@ -390,6 +400,8 @@ async function handleConfirm() {
     const payload = {
       title: formData.value.title,
       contentMd: formData.value.content,
+      // 渲染后的 HTML：编辑器 onHtmlChanged 回调产出，后端存 content_html 列
+      contentHtml: contentHtml.value || undefined,
       categoryId: formData.value.categoryId,
       tags: selectedTagIds,
       // 创建时留空不传字段，cover_image 保持 NULL 而非空串；编辑草稿时同编辑逻辑带空串
@@ -588,6 +600,7 @@ function handleReset() {
     content: '',
     coverImage: '',
   }
+  contentHtml.value = ''
   draftId.value = null
 }
 

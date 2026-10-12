@@ -535,7 +535,8 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     const tagObjs = (data?.tags || []).map((tid: number) => mockTags.find(t => t.id === tid)!).filter(Boolean)
     const a: Article = {
       id: Math.max(...mockArticles.map(x => x.id), 0) + 1,
-      userId: 1, title: data?.title || '', contentMd: data?.contentMd || '', contentHtml: '',
+      userId: 1, title: data?.title || '', contentMd: data?.contentMd || '',
+      contentHtml: data?.contentHtml || '',
       summary: data?.summary || '', coverImage: data?.coverImage || '',
       readingTime: data?.readingTime || 0, viewCount: 0, likeCount: 0, favCount: 0, commentCount: 0,
       status: data?.status ?? 1, allowComment: data?.allowComment ?? true, isTop: false,

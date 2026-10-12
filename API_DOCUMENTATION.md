@@ -416,6 +416,7 @@ Content-Type: application/json
 {
   "title": "string (1-200 字符，必填)",
   "contentMd": "string (Markdown 格式，至少 50 字符，必填)",
+  "contentHtml": "string (contentMd 渲染后的 HTML，可选；前端由编辑器 onHtmlChanged 回调产出后随创建提交，后端存 content_html 列)",
   "summary": "string (文章摘要，可选，不填则自动截取)",
   "coverImage": "string (封面图URL，可选)",
   "categoryId": 1 (分类ID，可选),
@@ -494,6 +495,7 @@ Content-Type: application/json
 {
   "title": "string (可选)",
   "contentMd": "string (可选，Markdown 正文)",
+  "contentHtml": "string (可选，渲染后的 HTML；提供时一并更新 content_html)",
   "summary": "string (可选)",
   "coverImage": "string (可选)",
   "categoryId": "number (可选)",
