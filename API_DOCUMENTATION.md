@@ -2401,6 +2401,58 @@ GET /posts/top?limit=10
 
 ---
 
+### 10. 我的文章（含草稿）
+
+**请求**
+
+```
+GET /posts/mine
+Authorization: Bearer {accessToken}
+```
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": [
+    {
+      "id": 12,
+      "userId": 7,
+      "title": "MySQL 到 PostgreSQL 迁移踩坑记录",
+      "summary": "……",
+      "coverImage": "https://example.com/cover.png",
+      "readingTime": 8,
+      "viewCount": 82,
+      "likeCount": 5,
+      "favCount": 2,
+      "status": 1,
+      "allowComment": 1,
+      "isTop": 0,
+      "createdAt": "2026-09-22T01:52:33",
+      "updatedAt": "2026-10-01T10:00:00",
+      "category": { "id": 3, "name": "数据库" },
+      "tags": [{ "id": 4, "name": "前端", "createdAt": "2026-08-30T06:00:31" }],
+      "authorNickname": "user",
+      "authorAvatar": "https://example.com/avatar.jpg"
+    }
+  ]
+}
+```
+
+**错误情况**
+
+- 401: 未登录 / accessToken 无效
+
+**备注**
+
+- 仅返回**当前登录用户**本人的文章，按 `updatedAt` 倒序；不含已软删（`deleted_at` 非空）的文章
+- 不过滤状态：草稿（`status=0`，含审核被拒回炉）、待审核（`status=2`）、已发布（`status=1`）都会返回，由前端按 `status` 分组展示（「我的文章」页的全部/已发布/审核中/草稿页签）
+- 用于「头像菜单 → 我的文章」页面（`/my-articles`，新标签页打开）；`GET /posts` 公开列表不受本接口影响
+
+---
+
 ## 前端请求示例
 
 ### 使用 axios 发起请求

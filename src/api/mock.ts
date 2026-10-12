@@ -473,6 +473,11 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     return ok(list)
   },
 
+  // ---- 我的文章（本人全部稿件：草稿/待审核/已发布，按更新时间倒序）----
+  [R('GET', /^\/posts\/mine$/)]: () => {
+    return ok([...mockArticles].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)))
+  },
+
   // ---- 待审核文章列表（status=2，分页）----
   [R('GET', /^\/posts\/pending$/)]: (_, __, params) => {
     const pending = mockArticles.filter(a => a.status === 2)

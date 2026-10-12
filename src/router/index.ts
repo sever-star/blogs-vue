@@ -32,6 +32,13 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   },
   {
+    // 我的文章（含草稿），从头像菜单以新标签页打开
+    path: '/my-articles',
+    name: 'MyArticles',
+    component: () => import('@/views/MyArticles.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/article/:id',
     name: 'ArticleDetail',
     component: () => import('@/views/ArticleDetail.vue'),

@@ -130,7 +130,8 @@ const handleCommand = (command: string) => {
       router.push('/profile')
       break
     case 'my-articles':
-      ElMessage.info('我的文章页面开发中')
+      // 新标签页打开（resolve().href 自带路由 base，兼容 /proxy/xxx 部署）
+      window.open(router.resolve({ name: 'MyArticles' }).href, '_blank')
       break
     case 'settings':
       ElMessage.info('账号设置页面开发中')

@@ -37,6 +37,14 @@ export const getTopArticles = async (limit = 10): Promise<ArticleListItem[]> => 
 }
 
 /**
+ * 我的文章（本人全部稿件：草稿/待审核/已发布，仅自己可见）
+ * GET /posts/mine
+ */
+export const getMyArticles = async (): Promise<ArticleListItem[]> => {
+  return client.get('/posts/mine')
+}
+
+/**
  * 获取单篇文章详情
  * GET /posts/{id}
  */
