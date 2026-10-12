@@ -58,7 +58,10 @@ export interface ArticleListItem {
   likeCount: number
   favCount: number
   commentCount: number
+  /** 发布状态：0=草稿 1=已发布 2=已下架 */
   status: number
+  /** 审核状态：0=待审核 1=通过 2=拒绝（仅 GET /posts/mine 返回，其余接口为空） */
+  reviewStatus?: number
   allowComment: boolean
   isTop: boolean
   createdAt: string
@@ -129,7 +132,7 @@ export interface ArticlePayload {
   categoryId?: number // 分类ID，可选
   tags: number[] // 标签 ID 数组
   readingTime?: number
-  status?: number // 0=草稿, 1=已发布(审核通过), 2=待审核
+  status?: number // 发布状态：0=草稿 1=已发布 2=已下架；审核状态看 review_status（0待审核/1通过/2拒绝）
   allowComment?: boolean
 }
 

@@ -258,7 +258,7 @@ export const useArticleStore = defineStore('article', () => {
   const createArticle = async (payload: ArticlePayload): Promise<Article | null> => {
     try {
       const created = await createArticleApi(payload)
-      // 新建的文章默认 status=2 待审核，不进已发布列表缓存；列表在下次进入时重新拉取
+      // 新建的文章 status=0（草稿/待审核由 review_status 承载），不进已发布列表缓存；列表在下次进入时重新拉取
       return created
     } catch (error) {
       console.error('创建文章失败:', error)

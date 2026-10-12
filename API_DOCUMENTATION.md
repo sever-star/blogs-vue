@@ -421,7 +421,7 @@ Content-Type: application/json
   "categoryId": 1 (分类ID，可选),
   "tags": [1, 2] (标签ID数组，至少 1 个，最多 5 个),
   "readingTime": 15 (预估阅读时间（分钟），可选),
-  "status": 0 (0=草稿, 1=已发布(审核通过), 2=待审核，可选，默认2),
+  "status": 0 (发布状态:0=草稿, 1=已发布, 2=已下架，可选，默认0；审核状态由 review_status 表示:0=待审核, 1=通过, 2=拒绝),
   "allowComment": true (是否允许评论，可选，默认true)
 }
 ```
@@ -499,7 +499,7 @@ Content-Type: application/json
   "categoryId": "number (可选)",
   "tags": [1, 2] (可选，标签 ID 数组；传空数组 [] 表示清空标签)",
   "readingTime": "number (可选)",
-  "status": "number (可选，0=草稿 1=已发布 2=待审核)",
+  "status": "number (可选，发布状态 0=草稿 1=已发布 2=已下架；实际状态由后端按编辑流程决定)",
   "allowComment": "boolean (可选)"
 }
 ```
@@ -559,8 +559,10 @@ Authorization: Bearer {accessToken}
 
 ### 6. 文章审核相关
 
-> 文章 `status` 为三态：`0=草稿`，`1=已发布(审核通过)`，`2=待审核`。
-> 用户写文章点「提交审核」后 status=2；管理员在后台审核：通过 → status=1（发布），驳回 → status=0（退回草稿）。
+> 文章有**两个独立状态字段**：
+> `status`（发布状态）：`0=草稿`，`1=已发布`，`2=已下架`；
+> `review_status`（审核状态）：`0=待审核`，`1=通过`，`2=拒绝`。
+> 用户点「提交审核」后 `review_status=0`（新建默认）；管理员审核：通过 → `status=1 + review_status=1`，驳回 → `status=0 + review_status=2`；编辑重新提交会把 `review_status` 归 0（已发布的文章编辑期间 `status=2` 下架待审）。
 
 #### 6.1 获取待审核文章列表
 
@@ -645,10 +647,10 @@ Authorization: Bearer {accessToken}
 **错误情况**
 
 - 401: 未登录
-- 400: 文章不在待审核状态（status ≠ 2）
+- 400: 非待审核状态（review_status ≠ 0，已审核通过或已被拒绝）
 - 404: 文章不存在
 
-> **实现差异**：后端 `BlogPostController` 当前为 `PUT /api/posts/{id}/publish`（路径为 `/publish` 而非 `/approve`）。前端 `article.ts` 调用的是 `/approve`，需后端补齐别名或在接入层对齐。
+> **实现差异**：后端已提供 `PUT /api/posts/{id}/approve`（历史 `/publish` 路径差异已对齐）。
 
 #### 6.3 审核驳回（退回草稿）
 
@@ -664,7 +666,7 @@ Authorization: Bearer {accessToken}
 |-----|------|------|
 | id | number | 文章 ID |
 
-**返回**（更新后的完整文章对象，`status` 置为 `0`）
+**返回**（更新后的完整文章对象，`status` 置为 `0`、`review_status` 置为 `2`）
 
 ```json
 {
@@ -681,7 +683,7 @@ Authorization: Bearer {accessToken}
 **错误情况**
 
 - 401: 未登录
-- 400: 文章不在待审核状态（status ≠ 2）
+- 400: 文章已是拒绝状态（review_status = 2）
 - 404: 文章不存在
 
 ---
@@ -2448,7 +2450,8 @@ Authorization: Bearer {accessToken}
 **备注**
 
 - 仅返回**当前登录用户**本人的文章，按 `updatedAt` 倒序；不含已软删（`deleted_at` 非空）的文章
-- 不过滤状态：草稿（`status=0`，含审核被拒回炉）、待审核（`status=2`）、已发布（`status=1`）都会返回，由前端按 `status` 分组展示（「我的文章」页的全部/已发布/审核中/草稿页签）
+- 返回两个状态字段：`status`（发布状态：0=草稿 1=已发布 2=已下架）与 `reviewStatus`（审核状态：0=待审核 1=通过 2=拒绝，仅本接口返回）
+- 前端「我的文章」页按 `status` 分页签（全部/已发布/草稿/已下架），行内另用 `reviewStatus` 展示「待审核/审核被拒」标签（通过时不显示）
 - 用于「头像菜单 → 我的文章」页面（`/my-articles`，新标签页打开）；`GET /posts` 公开列表不受本接口影响
 
 ---
@@ -2618,7 +2621,10 @@ CREATE TABLE blog_posts (
   like_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '点赞数（冗余计数）',
   fav_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '收藏数（冗余计数）',
   reading_time TINYINT UNSIGNED DEFAULT 0 COMMENT '阅读时长(分钟)',
-  status TINYINT NOT NULL DEFAULT 2 COMMENT '0=草稿,1=已发布,2=待审核（列默认2，但@PrePersist置1）',
+  status TINYINT NOT NULL DEFAULT 2 COMMENT '发布状态:0=草稿,1=已发布,2=已下架（历史默认2，新文章应显式传0）',
+  review_status TINYINT NOT NULL DEFAULT 0 COMMENT '审核状态:0=待审核,1=通过,2=拒绝（独立于 status 的另一维度）',
+  reviewer_id INT DEFAULT NULL COMMENT '审核人 ID',
+  reviewed_at DATETIME DEFAULT NULL COMMENT '审核时间',
   is_top TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1=置顶,0=普通',
   allow_comment TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=允许评论,0=禁止',
   created_at DATETIME NOT NULL,
@@ -3052,9 +3058,9 @@ JPA 默认 `Boolean` ↔ `TINYINT(1)`；前端需确保收到 `0/1` 时按布尔
 - 方案 A（推荐）：新增 `PostCreateDTO{...,tags:number[]}`，service 内先存 `BlogPost` 再批量插 `blog_post_tags`；
 - 方案 B：前端创建文章后单独调标签绑定接口（文档未定义，不推荐）。
 
-### 8. 状态默认值矛盾
+### 8. 状态字段语义（status vs review_status）
 
-`BlogPost` 实体 `status` 列 `DEFAULT 2`（待审核），但 `@PrePersist` 强制置 `1`（已发布）。**实际新建文章始终是「已发布」，绕过审核**。应统一：要么去掉 `@PrePersist` 的覆盖让默认值生效，要么前端显式传 `status`（文档已要求传 `status`）。
+文章有两组独立状态：`status`（发布状态：0=草稿 1=已发布 2=已下架）与 `review_status`（审核状态：0=待审核 1=通过 2=拒绝）。`status` 列 `DEFAULT 2` 是历史遗留——旧语义里 2 表示「待审核」，新语义下会变成「已下架」，因此 `PostRequest.status` 缺省值已改为 0（草稿），前端创建/提交也显式传 0；审核流转只改 `review_status`（配合 approve/reject 同步调整 `status`）。
 
 ---
 

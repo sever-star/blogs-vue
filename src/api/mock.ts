@@ -473,9 +473,13 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     return ok(list)
   },
 
-  // ---- 我的文章（本人全部稿件：草稿/待审核/已发布，按更新时间倒序）----
+  // ---- 我的文章（本人全部稿件，按更新时间倒序；补 reviewStatus 审核状态字段）----
   [R('GET', /^\/posts\/mine$/)]: () => {
-    return ok([...mockArticles].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)))
+    return ok(
+      [...mockArticles]
+        .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+        .map((a) => ({ ...a, reviewStatus: a.status === 1 ? 1 : 0 }))
+    )
   },
 
   // ---- 待审核文章列表（status=2，分页）----

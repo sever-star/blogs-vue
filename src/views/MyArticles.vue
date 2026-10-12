@@ -13,12 +13,12 @@
         </el-button>
       </div>
 
-      <!-- 状态筛选 -->
+      <!-- 按发布状态（status）筛选：0=草稿 1=已发布 2=已下架 -->
       <el-tabs v-model="activeTab" class="status-tabs">
         <el-tab-pane :label="`全部 (${counts.all})`" name="all" />
         <el-tab-pane :label="`已发布 (${counts.published})`" name="published" />
-        <el-tab-pane :label="`审核中 (${counts.pending})`" name="reviewing" />
         <el-tab-pane :label="`草稿 (${counts.draft})`" name="draft" />
+        <el-tab-pane :label="`已下架 (${counts.offline})`" name="offline" />
       </el-tabs>
 
       <!-- 加载中 -->
@@ -64,8 +64,18 @@
               >
                 {{ article.title }}
               </a>
+              <!-- 发布状态：status -->
               <el-tag :type="statusMeta(article.status).type" size="small" effect="light">
                 {{ statusMeta(article.status).label }}
+              </el-tag>
+              <!-- 审核状态：review_status（通过时不显示，已发布/已下架本身可推断） -->
+              <el-tag
+                v-if="reviewTag(article).label"
+                :type="reviewTag(article).type"
+                size="small"
+                effect="plain"
+              >
+                {{ reviewTag(article).label }}
               </el-tag>
             </div>
 
@@ -120,33 +130,45 @@ const loadError = ref('')
 // all | published | reviewing | draft
 const activeTab = ref('all')
 
-/** 状态标签：0=草稿(含被拒回炉) 1=已发布 2=待审核 */
+/** 发布状态标签（status）：0=草稿 1=已发布 2=已下架 */
 function statusMeta(status: number) {
   switch (status) {
     case 1:
       return { label: '已发布', type: 'success' as const }
     case 2:
-      return { label: '审核中', type: 'warning' as const }
+      return { label: '已下架', type: 'danger' as const }
     default:
       return { label: '草稿', type: 'info' as const }
   }
 }
 
+/**
+ * 审核状态标签（review_status）：0=待审核 1=通过 2=拒绝。
+ * 通过（1）不显示标签——已发布/已下架已能推断；缺字段时按 status 推导兜底。
+ * 返回空 label 表示无需展示（模板用 v-if="label" 判断，避免模板里的非空断言）。
+ */
+function reviewTag(article: ArticleListItem) {
+  const rs = article.reviewStatus ?? (article.status === 1 ? 1 : 0)
+  if (rs === 2) return { label: '审核被拒', type: 'danger' as const }
+  if (rs === 0) return { label: '待审核', type: 'warning' as const }
+  return { label: '', type: 'info' as const }
+}
+
 const counts = computed(() => ({
   all: articles.value.length,
   published: articles.value.filter((a) => a.status === 1).length,
-  pending: articles.value.filter((a) => a.status === 2).length,
-  draft: articles.value.filter((a) => a.status !== 1 && a.status !== 2).length,
+  draft: articles.value.filter((a) => a.status === 0).length,
+  offline: articles.value.filter((a) => a.status === 2).length,
 }))
 
 const filteredArticles = computed(() => {
   switch (activeTab.value) {
     case 'published':
       return articles.value.filter((a) => a.status === 1)
-    case 'reviewing':
-      return articles.value.filter((a) => a.status === 2)
     case 'draft':
-      return articles.value.filter((a) => a.status !== 1 && a.status !== 2)
+      return articles.value.filter((a) => a.status === 0)
+    case 'offline':
+      return articles.value.filter((a) => a.status === 2)
     default:
       return articles.value
   }
@@ -156,10 +178,10 @@ const emptyText = computed(() => {
   switch (activeTab.value) {
     case 'published':
       return '还没有已发布的文章'
-    case 'reviewing':
-      return '没有审核中的文章'
     case 'draft':
       return '没有草稿'
+    case 'offline':
+      return '没有已下架的文章'
     default:
       return '还没有写过文章，点击右上角开始创作'
   }

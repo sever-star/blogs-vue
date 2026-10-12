@@ -373,7 +373,9 @@ async function handleConfirm() {
         tags: selectedTagIds,
         // 编辑时始终带当前值：空串表示用户移除了封面（后端收到非 null 才覆盖）
         coverImage: formData.value.coverImage.trim(),
-        status: 2, // 修改后重新提交审核
+        // 占位：编辑的发布/审核状态由后端按新语义决定
+        // （草稿保持草稿 0，已发布的编辑期间下架 2，同时 review_status 归 0 重审）
+        status: 0,
       })
       ElMessage.success('修改已保存，等待重新审核')
       metaDialogVisible.value = false
@@ -381,7 +383,10 @@ async function handleConfirm() {
       return
     }
 
-    const status = dialogMode.value === 'draft' ? 0 : 2
+    // 新语义：提交审核不改发布状态——新建统一 status=0（草稿），
+    // 待审核由 review_status 承载（新建默认 0，通过后 approve 置 status=1/review_status=1）；
+    // status=2 表示「已下架」而非「待审核」
+    const isDraft = dialogMode.value === 'draft'
     const payload = {
       title: formData.value.title,
       contentMd: formData.value.content,
@@ -389,7 +394,7 @@ async function handleConfirm() {
       tags: selectedTagIds,
       // 创建时留空不传字段，cover_image 保持 NULL 而非空串；编辑草稿时同编辑逻辑带空串
       coverImage: formData.value.coverImage.trim() || undefined,
-      status,
+      status: 0,
     }
 
     if (draftId.value !== null) {
@@ -405,7 +410,7 @@ async function handleConfirm() {
 
     metaDialogVisible.value = false
 
-    if (status === 0) {
+    if (isDraft) {
       // 存草稿：留在编辑页继续写
       ElMessage.success('草稿已保存')
       return

@@ -37,7 +37,8 @@ export const getTopArticles = async (limit = 10): Promise<ArticleListItem[]> => 
 }
 
 /**
- * 我的文章（本人全部稿件：草稿/待审核/已发布，仅自己可见）
+ * 我的文章（本人全部稿件，仅自己可见）
+ * status：0=草稿 1=已发布 2=已下架；reviewStatus：0=待审核 1=通过 2=拒绝
  * GET /posts/mine
  */
 export const getMyArticles = async (): Promise<ArticleListItem[]> => {
@@ -77,7 +78,7 @@ export const deleteArticle = async (id: number): Promise<void> => {
 }
 
 /**
- * 获取待审核文章列表（status=2，分页）
+ * 获取待审核文章列表（review_status=0 待审核，分页）
  * GET /posts/pending?page=&pageSize=
  */
 export const getPendingArticles = async (
