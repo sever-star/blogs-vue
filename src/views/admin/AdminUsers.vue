@@ -28,9 +28,10 @@
         <el-table-column prop="email" label="邮箱" min-width="180" show-overflow-tooltip />
         <el-table-column label="角色" width="150">
           <template #default="{ row }">
+            <!-- 账号禁用期间角色锁定：启用后才能调整 -->
             <el-select
               :model-value="row.role"
-              :disabled="isSelf(row) || pendingId === row.id"
+              :disabled="isSelf(row) || pendingId === row.id || row.status !== 1"
               size="small"
               @change="(val: UserRole) => handleRoleChange(row, val)"
             >
