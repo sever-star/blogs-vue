@@ -81,7 +81,12 @@
           <span class="action-count">{{ articleStore.currentArticle.favCount ?? 0 }}</span>
           <span class="action-label">收藏</span>
         </button>
-        <button type="button" class="action-item" @click="handleLike">
+        <button
+          type="button"
+          class="action-item"
+          :class="{ 'is-liked': isLiked }"
+          @click="handleLike"
+        >
           <!-- Element Plus 图标库无大拇指，用内联 SVG（fill=currentColor 跟随按钮悬停/高亮变色） -->
           <svg class="thumb-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path
@@ -185,8 +190,25 @@ onUnmounted(() => {
   document.title = previousTitle
 })
 
-function handleLike() {
-  ElMessage.success('已点赞')
+// 是否已点赞：详情接口仅在登录时返回 liked
+const isLiked = computed(() => !!articleStore.currentArticle?.liked)
+
+async function handleLike() {
+  if (!authStore.isLoggedIn) {
+    ElMessage.warning('请先登录后再点赞')
+    return
+  }
+  try {
+    if (isLiked.value) {
+      await articleStore.unlikeArticle(articleId.value)
+      ElMessage.success('已取消点赞')
+    } else {
+      await articleStore.likeArticle(articleId.value)
+      ElMessage.success('已点赞')
+    }
+  } catch (error) {
+    ElMessage.error(errorText(error, '点赞失败'))
+  }
 }
 
 // 是否已收藏：详情接口仅在登录时返回 favorited，游客看到的是未收藏态
@@ -344,6 +366,15 @@ function formatDate(dateString: string): string {
   border-color: #409eff;
   background: #ecf5ff;
   color: #409eff;
+}
+
+/* 已点赞：红色强调 */
+.action-item.is-liked,
+.action-item.is-liked .action-count,
+.action-item.is-liked .action-label {
+  border-color: #f56c6c;
+  background: #fef0f0;
+  color: #f56c6c;
 }
 
 /* ---- 右侧评论弹窗 ---- */

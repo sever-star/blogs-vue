@@ -13,6 +13,7 @@ import {
   updateArticle as updateArticleApi,
   deleteArticle as deleteArticleApi,
   likeArticle as likeArticleApi,
+  unlikeArticle as unlikeArticleApi,
   favoriteArticle as favoriteArticleApi,
   unfavoriteArticle as unfavoriteArticleApi,
 } from '@/api/article'
@@ -302,18 +303,41 @@ export const useArticleStore = defineStore('article', () => {
   }
 
   /** 点赞文章 */
+  /** 点赞文章：后端返回操作后的点赞总数，本地以返回值为准（不自增） */
   const likeArticle = async (id: number) => {
     try {
-      // TODO: 接入真实 API: POST /posts/{id}/like
-      // const { likeCount } = await likeArticleApi(id)
-      // ...update local state
+      const { likeCount } = await likeArticleApi(id)
 
       const article = allArticles.value.find(a => a.id === id)
       if (article) {
-        article.likeCount += 1
+        article.likeCount = likeCount
+      }
+      if (currentArticle.value?.id === id) {
+        currentArticle.value.likeCount = likeCount
+        currentArticle.value.liked = true
       }
     } catch (error) {
       console.error('点赞失败:', error)
+      throw error // 详情页需要感知失败原因（未登录/已点赞等）并提示
+    }
+  }
+
+  /** 取消点赞文章：返回操作后的点赞总数 */
+  const unlikeArticle = async (id: number) => {
+    try {
+      const { likeCount } = await unlikeArticleApi(id)
+
+      const article = allArticles.value.find(a => a.id === id)
+      if (article) {
+        article.likeCount = likeCount
+      }
+      if (currentArticle.value?.id === id) {
+        currentArticle.value.likeCount = likeCount
+        currentArticle.value.liked = false
+      }
+    } catch (error) {
+      console.error('取消点赞失败:', error)
+      throw error
     }
   }
 
@@ -396,6 +420,7 @@ export const useArticleStore = defineStore('article', () => {
     updateArticle,
     deleteArticle,
     likeArticle,
+    unlikeArticle,
     favoriteArticle,
     unfavoriteArticle,
     resetSelection,

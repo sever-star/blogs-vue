@@ -3035,11 +3035,15 @@ JPA 默认 `Boolean` ↔ `TINYINT(1)`；前端需确保收到 `0/1` 时按布尔
 以下文档接口在后端**尚无控制器实现**，需补齐：
 
 - 评论：`GET/POST /posts/{articleId}/comments`、`GET/PUT/DELETE /posts/{articleId}/comments/{commentId}`、`POST/DELETE .../like`
-- 文章点赞：`POST/DELETE /posts/{id}/like`
-- 审核拒绝：`PUT /posts/{id}/reject`
-
-已从本清单移除（后端已实现）：文章收藏 `POST/DELETE /posts/{id}/favorite`（2026-10-10 补齐 DELETE，登录即可、非管理员专属）、待审核列表 `GET /posts/pending`。
 - 浏览量排行：`GET /posts/top`
+
+已从本清单移除（后端已实现）：
+
+- 文章收藏 `POST/DELETE /posts/{id}/favorite`（2026-10-10 补齐 DELETE，登录即可、非管理员专属）
+- 待审核列表 `GET /posts/pending`
+- 文章点赞 `POST/DELETE /posts/{id}/like`（2026-10-12 补齐 DELETE 端点与 SecurityConfig 规则，登录即可，非管理员专属）
+- 审核拒绝 `PUT /posts/{id}/reject`
+- 我的文章 `GET /posts/mine`（2026-10-12，仅本人、含草稿）
 
 ### 7. 创建文章的标签保存
 
