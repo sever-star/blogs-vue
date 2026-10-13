@@ -794,12 +794,10 @@ GET /posts/{articleId}/comments
       "parentId": 0,
       "replyToId": 0,
       "nickname": "李四",
-      "email": "lisi@example.com",
       "avatar": "https://ui-avatars.com/api/?name=lisi",
       "content": "很详细的讲解，感谢分享！",
       "likeCount": 5,
       "isAdmin": false,
-      "status": 1,
       "createdAt": "2024-01-16T10:30:00Z",
       "replies": [
         {
@@ -809,12 +807,10 @@ GET /posts/{articleId}/comments
           "parentId": 1,
           "replyToId": 1,
           "nickname": "王五",
-          "email": "",
           "avatar": "https://ui-avatars.com/api/?name=wangwu",
           "content": "@李四 同意，受益匪浅！",
           "likeCount": 1,
           "isAdmin": false,
-          "status": 1,
           "createdAt": "2024-01-16T14:00:00Z"
         }
       ],
@@ -829,7 +825,8 @@ GET /posts/{articleId}/comments
 - **不分页**：一次性返回全部评论，支撑前端「默认展示 5 条（含各自的嵌套回复）→ 查看全部 → 容器内滚动」以及评论弹窗内直接全量滚动的交互
 - `data` 为**顶级评论**（`parentId=0`）数组；`replies` 为该评论下的二级回复（嵌套数据，回复中不再嵌套）
 - 顶级评论按 `createdAt` 倒序（最新在前），`replies` 按 `createdAt` 正序（先回复先展示）
-- 仅返回已审核评论（`status=1`）；未登录可读，登录时每条额外返回 `liked`（当前用户是否点赞该评论）
+- **响应不含 `email` 与 `status` 字段**：邮箱属用户隐私不对外返回；服务端只回已审核评论（过滤条件 `status=1`），该字段对外冗余
+- 未登录可读，登录时每条额外返回 `liked`（当前用户是否点赞该评论）
 - **实现状态**：后端当前 GET 实现返回分页 `PageResult`（`data` 内带 `total/page/pageSize`），需对齐为本节的**全量嵌套数组**契约
 
 ---
