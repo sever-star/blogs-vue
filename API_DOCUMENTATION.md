@@ -770,7 +770,7 @@ Authorization: Bearer {accessToken}
 **请求**
 
 ```
-GET /posts/{articleId}/comments?page=1&pageSize=20
+GET /posts/{articleId}/comments
 ```
 
 **URL 参数**
@@ -778,67 +778,59 @@ GET /posts/{articleId}/comments?page=1&pageSize=20
 |-----|------|------|
 | articleId | number | 文章 ID |
 
-**Query 参数**
-| 参数 | 类型 | 必需 | 说明 |
-|-----|------|------|------|
-| page | number | 否 | 当前页码，默认 1 |
-| pageSize | number | 否 | 每页数量，默认 20 |
+> **不分页**：无 `page` / `pageSize` 参数，接口一次性返回该文章的全部评论（前端评论区改为「默认 5 条 + 查看全部 / 容器内下拉滚动」的交互，需要全量数据）。
 
-**返回**
+**返回**（`data` 直接是顶级评论数组，每条嵌套其二级回复）
 
 ```json
 {
   "code": 200,
   "message": "操作成功",
-  "data": {
-    "data": [
-      {
-        "id": 1,
-        "articleId": 1,
-        "userId": 2,
-        "parentId": 0,
-        "replyToId": 0,
-        "nickname": "李四",
-        "email": "lisi@example.com",
-        "avatar": "https://ui-avatars.com/api/?name=lisi",
-        "content": "很详细的讲解，感谢分享！",
-        "likeCount": 5,
-        "isAdmin": false,
-        "status": 1,
-        "createdAt": "2024-01-16T10:30:00Z",
-        "replies": [
-          {
-            "id": 3,
-            "articleId": 1,
-            "userId": null,
-            "parentId": 1,
-            "replyToId": 1,
-            "nickname": "游客",
-            "email": "",
-            "avatar": "https://ui-avatars.com/api/?name=guest",
-            "content": "@李四 同意，受益匪浅！",
-            "likeCount": 1,
-            "isAdmin": false,
-            "status": 1,
-            "createdAt": "2024-01-16T14:00:00Z"
-          }
-        ],
-        "liked": false
-      }
-    ],
-    "total": 12,
-    "page": 1,
-    "pageSize": 20,
-    "totalPages": 1
-  }
+  "data": [
+    {
+      "id": 1,
+      "articleId": 1,
+      "userId": 2,
+      "parentId": 0,
+      "replyToId": 0,
+      "nickname": "李四",
+      "email": "lisi@example.com",
+      "avatar": "https://ui-avatars.com/api/?name=lisi",
+      "content": "很详细的讲解，感谢分享！",
+      "likeCount": 5,
+      "isAdmin": false,
+      "status": 1,
+      "createdAt": "2024-01-16T10:30:00Z",
+      "replies": [
+        {
+          "id": 3,
+          "articleId": 1,
+          "userId": 7,
+          "parentId": 1,
+          "replyToId": 1,
+          "nickname": "王五",
+          "email": "",
+          "avatar": "https://ui-avatars.com/api/?name=wangwu",
+          "content": "@李四 同意，受益匪浅！",
+          "likeCount": 1,
+          "isAdmin": false,
+          "status": 1,
+          "createdAt": "2024-01-16T14:00:00Z"
+        }
+      ],
+      "liked": false
+    }
+  ]
 }
 ```
 
 **备注**
 
-- 按 `createdAt` 倒序排列
-- `replies` 为嵌套的子回复（二级评论）
-- 需要认证时返回 `liked` 字段
+- **不分页**：一次性返回全部评论，支撑前端「默认展示 5 条（含各自的嵌套回复）→ 查看全部 → 容器内滚动」以及评论弹窗内直接全量滚动的交互
+- `data` 为**顶级评论**（`parentId=0`）数组；`replies` 为该评论下的二级回复（嵌套数据，回复中不再嵌套）
+- 顶级评论按 `createdAt` 倒序（最新在前），`replies` 按 `createdAt` 正序（先回复先展示）
+- 仅返回已审核评论（`status=1`）；未登录可读，登录时每条额外返回 `liked`（当前用户是否点赞该评论）
+- **实现状态**：后端当前 GET 实现返回分页 `PageResult`（`data` 内带 `total/page/pageSize`），需对齐为本节的**全量嵌套数组**契约
 
 ---
 
