@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Comment, CommentPayload, PaginatedResponse } from '@/types'
+import type { Comment, CommentPayload } from '@/types'
 
 export type { Comment }
 
@@ -108,21 +108,6 @@ export const useCommentStore = defineStore('comment', () => {
     }))
   }
 
-  /** 获取指定文章的平铺评论列表（分页） */
-  const getCommentsByPost = (articleId: number, page: number = 1, pageSize: number = 10): PaginatedResponse<Comment> => {
-    const allComments = commentMap.value.get(articleId) || []
-    const start = (page - 1) * pageSize
-    const end = start + pageSize
-    const data = allComments.slice(start, end)
-    return {
-      data,
-      total: allComments.length,
-      page,
-      pageSize: pageSize,
-      totalPages: Math.ceil(allComments.length / pageSize),
-    }
-  }
-
   /** 添加评论 */
   const addComment = async (payload: CommentPayload & { articleId: number }): Promise<Comment | null> => {
     try {
@@ -217,7 +202,6 @@ export const useCommentStore = defineStore('comment', () => {
     loading,
     fetchComments,
     getArticleComments,
-    getCommentsByPost,
     addComment,
     likeComment,
     unlikeComment,

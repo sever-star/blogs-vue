@@ -20,9 +20,9 @@
       <p>请 <el-button link @click="handleLogin">登录</el-button> 后发表评论</p>
     </div>
 
-    <!-- 评论列表 -->
+    <!-- 评论列表：默认只展示 5 条，容器内下拉滚动 -->
     <div class="comments-list">
-      <div v-for="comment in comments" :key="comment.id" class="comment-item">
+      <div v-for="comment in visibleComments" :key="comment.id" class="comment-item">
         <img :src="comment.avatar" :alt="comment.nickname" class="user-avatar" />
         <div class="comment-content">
           <div class="comment-header">
@@ -62,6 +62,14 @@
       </div>
     </div>
 
+    <!-- 超过 5 条：展开查看全部 / 收起 -->
+    <div v-if="comments.length > PREVIEW_COUNT" class="show-all">
+      <el-button v-if="!showAll" link type="primary" @click="showAll = true">
+        查看全部评论（共 {{ comments.length }} 条）
+      </el-button>
+      <el-button v-else link type="primary" @click="showAll = false">收起</el-button>
+    </div>
+
     <!-- 暂无评论 -->
     <div v-if="comments.length === 0" class="no-comments">
       <el-empty description="暂无评论" />
@@ -87,6 +95,15 @@ const newComment = ref('')
 const submitting = ref(false)
 
 const comments = computed(() => commentStore.getArticleComments(props.articleId))
+
+// 分页式改为下拉式：默认只展示 5 条顶级评论，点「查看全部评论」展开，
+// 列表容器固定高度内滚动（见样式 .comments-list）
+const PREVIEW_COUNT = 5
+const showAll = ref(false)
+
+const visibleComments = computed(() =>
+  showAll.value ? comments.value : comments.value.slice(0, PREVIEW_COUNT)
+)
 
 onMounted(async () => {
   await commentStore.fetchComments(props.articleId)
@@ -219,6 +236,18 @@ function formatCommentDate(dateString: string): string {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* 下拉形式：内容超出后在容器内滚动，不把页面撑长 */
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* 查看全部/收起 */
+.show-all {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed #e5e7eb;
+  text-align: center;
 }
 
 .comment-item {
