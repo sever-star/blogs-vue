@@ -93,6 +93,12 @@ onMounted(async () => {
 })
 
 async function submitComment() {
+  // 硬拦截：评论必须登录（表单虽然只对登录用户渲染，这里再兜一层防状态过期）
+  if (!authStore.isLoggedIn) {
+    ElMessage.warning('评论需要登录')
+    authStore.openLoginModal()
+    return
+  }
   if (!newComment.value.trim()) {
     ElMessage.warning('请输入评论内容')
     return
@@ -106,8 +112,13 @@ async function submitComment() {
     })
     newComment.value = ''
     ElMessage.success('评论发布成功')
-  } catch (error) {
-    ElMessage.error('评论失败，请重试')
+  } catch (error: any) {
+    // 透出后端原因（401 未登录 / 内容过长 / 文章不允许评论等）
+    const message =
+      error && typeof error === 'object' && 'message' in error
+        ? String(error.message ?? '')
+        : ''
+    ElMessage.error(message || '评论失败，请重试')
     console.error('评论失败:', error)
   } finally {
     submitting.value = false

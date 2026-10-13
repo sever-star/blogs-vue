@@ -836,7 +836,6 @@ GET /posts/{articleId}/comments?page=1&pageSize=20
 
 **备注**
 
-- 不需要认证
 - 按 `createdAt` 倒序排列
 - `replies` 为嵌套的子回复（二级评论）
 - 需要认证时返回 `liked` 字段
@@ -849,7 +848,7 @@ GET /posts/{articleId}/comments?page=1&pageSize=20
 
 ```
 POST /posts/{articleId}/comments
-Authorization: Bearer {accessToken} (可选，游客也可评论)
+Authorization: Bearer {accessToken} (必需，评论必须登录)
 Content-Type: application/json
 ```
 
@@ -863,12 +862,12 @@ Content-Type: application/json
 ```json
 {
   "content": "string (1-1000 字符，必填)",
-  "nickname": "string (游客评论时必填，登录用户可选)",
-  "email": "string (游客评论时必填)",
   "parentId": 0 (父评论ID，0=顶级评论，可选),
   "replyToId": 0 (被回复评论ID，可选)
 }
 ```
+
+> `nickname` / `email` 已废弃：评论必须登录，昵称/头像等身份信息取自 token 对应账户，不再接受入参传入。
 
 **返回**
 
@@ -896,14 +895,14 @@ Content-Type: application/json
 
 **错误情况**
 
+- 401: 未登录（评论必须登录，由前端强制；后端接口就绪后应同样校验）
 - 404: 文章不存在
 - 400: 评论内容为空或过长
-- 400: 游客评论缺少昵称或邮箱
 - 400: 文章不允许评论 (`allowComment` = false)
 
 **备注**
 
-- 登录用户自动使用账户信息；游客需提供 `nickname` 和 `email`
+- **必须登录才能评论**（游客仅可阅读评论列表）；身份信息取自 token 对应账户
 - `parentId` 非 0 时表示回复某条评论
 - 新评论 `status` 默认为 0（待审核）
 - 评论发表成功后文章 `commentCount` +1
@@ -3004,14 +3003,14 @@ JPA 默认 `Boolean` ↔ `TINYINT(1)`；前端需确保收到 `0/1` 时按布尔
 
 **BlogPostController（`/api/posts`）现状 vs 文档：**
 
-| 文档路径                                           | 后端现状                                                                                | 差异说明                                                                                          |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `GET /posts?categoryId&tagId&keyword`（列表）      | `GET /posts/published`、`GET /posts/category/{categoryId}`、`GET /posts/search?keyword` | 后端拆成多接口、**不支持组合筛选与分页**；前端 `getArticles` 期望单接口不分页返回全量             |
+| 文档路径                                           | 后端现状                                                                                | 差异说明                                                                                                    |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `GET /posts?categoryId&tagId&keyword`（列表）      | `GET /posts/published`、`GET /posts/category/{categoryId}`、`GET /posts/search?keyword` | 后端拆成多接口、**不支持组合筛选与分页**；前端 `getArticles` 期望单接口不分页返回全量                       |
 | `GET /posts/{id}`（详情含 category/tags/liked 等） | `GET /posts/{id}` 返回裸 `BlogPost`                                                     | 缺派生字段（见 §2）；浏览量已在 `GET /posts/{id}` 查询后防刷自动 +1，**无单独 `PUT /posts/{id}/view` 接口** |
-| `POST /posts`（入参含 `tags:number[]`）            | `POST /posts` 入参是裸 `BlogPost`                                                       | **入参无 `tags` 字段**，标签需另存 `blog_post_tags`；`status` 默认 `@PrePersist` 置 1（绕过审核） |
-| `PUT /posts/{id}/approve`                          | `PUT /posts/{id}/publish`                                                               | 路径不同；且**无 `/reject` 接口**                                                                 |
-| `GET /posts/pending`（待审核分页）                 | 无                                                                                      | 未实现                                                                                            |
-| `POST/DELETE /posts/{id}/like`、收藏接口           | 无                                                                                      | 未实现控制器                                                                                      |
+| `POST /posts`（入参含 `tags:number[]`）            | `POST /posts` 入参是裸 `BlogPost`                                                       | **入参无 `tags` 字段**，标签需另存 `blog_post_tags`；`status` 默认 `@PrePersist` 置 1（绕过审核）           |
+| `PUT /posts/{id}/approve`                          | `PUT /posts/{id}/publish`                                                               | 路径不同；且**无 `/reject` 接口**                                                                           |
+| `GET /posts/pending`（待审核分页）                 | 无                                                                                      | 未实现                                                                                                      |
+| `POST/DELETE /posts/{id}/like`、收藏接口           | 无                                                                                      | 未实现控制器                                                                                                |
 
 **BlogUserController（`/api/auth`）现状 vs 文档：**
 
@@ -3042,7 +3041,7 @@ JPA 默认 `Boolean` ↔ `TINYINT(1)`；前端需确保收到 `0/1` 时按布尔
 
 以下文档接口在后端**尚无控制器实现**，需补齐：
 
-- 评论：`GET/POST /posts/{articleId}/comments`、`GET/PUT/DELETE /posts/{articleId}/comments/{commentId}`、`POST/DELETE .../like`
+- 评论：`POST /posts/{articleId}/comments`（必须登录，见 §2 契约）、`GET/PUT/DELETE /posts/{articleId}/comments/{commentId}`、评论点赞 `POST/DELETE .../like`（评论列表 `GET /posts/{articleId}/comments` 已实现）
 - 浏览量排行：`GET /posts/top`
 
 已从本清单移除（后端已实现）：
