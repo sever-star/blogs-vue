@@ -28,7 +28,7 @@
           <div class="comment-header">
             <span class="username">
               {{ comment.nickname }}
-              <el-tag v-if="comment.isAdmin" size="small" type="danger" class="admin-badge">博主</el-tag>
+              <el-tag v-if="comment.isAdmin === 1" size="small" type="danger" class="admin-badge">博主</el-tag>
             </span>
             <span class="comment-time">{{ formatCommentDate(comment.createdAt) }}</span>
           </div>
@@ -50,7 +50,7 @@
                 <div class="reply-header">
                   <span class="reply-username">
                     {{ reply.nickname }}
-                    <el-tag v-if="reply.isAdmin" size="small" type="danger" class="admin-badge">博主</el-tag>
+                    <el-tag v-if="reply.isAdmin === 1" size="small" type="danger" class="admin-badge">博主</el-tag>
                   </span>
                   <span class="reply-time">{{ formatCommentDate(reply.createdAt) }}</span>
                 </div>

@@ -94,7 +94,7 @@ export interface Comment {
   avatar: string
   content: string
   likeCount: number
-  isAdmin: boolean
+  isAdmin: number // 0=普通用户 1=博主（后端返回 short）
   status: number
   createdAt: string
   replies?: Comment[]

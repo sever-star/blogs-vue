@@ -386,7 +386,7 @@ function formatDate(dateString: string): string {
   top: 70px;
   right: 0;
   bottom: 0;
-  width: 320px;
+  width: 370px;
   background: #fff;
   border-left: 1px solid #e5e7eb;
   box-shadow: -4px 0 12px rgba(0, 0, 0, 0.08);
@@ -705,7 +705,7 @@ article {
   }
 
   .comment-drawer {
-    width: min(320px, 85vw);
+    width: min(370px, 85vw);
   }
 
   .article-header {

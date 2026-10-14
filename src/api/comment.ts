@@ -22,6 +22,8 @@ export const getCommentById = async (articleId: number, commentId: number): Prom
   return client.get(`/posts/${articleId}/comments/${commentId}`)
 }
 
+// 评论发布后不可修改，只保留删除：原 PUT /posts/{articleId}/comments/{commentId} 已移除。
+
 /**
  * 发表评论
  * POST /posts/{articleId}/comments
@@ -31,18 +33,6 @@ export const submitComment = async (
   payload: CommentPayload
 ): Promise<Comment> => {
   return client.post(`/posts/${articleId}/comments`, payload)
-}
-
-/**
- * 更新评论
- * PUT /posts/{articleId}/comments/{commentId}
- */
-export const updateComment = async (
-  articleId: number,
-  commentId: number,
-  content: string
-): Promise<Comment> => {
-  return client.put(`/posts/${articleId}/comments/${commentId}`, { content })
 }
 
 /**

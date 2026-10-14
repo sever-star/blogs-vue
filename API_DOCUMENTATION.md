@@ -797,7 +797,7 @@ GET /posts/{articleId}/comments
       "avatar": "https://ui-avatars.com/api/?name=lisi",
       "content": "很详细的讲解，感谢分享！",
       "likeCount": 5,
-      "isAdmin": false,
+      "isAdmin": 0,
       "createdAt": "2024-01-16T10:30:00Z",
       "replies": [
         {
@@ -810,7 +810,7 @@ GET /posts/{articleId}/comments
           "avatar": "https://ui-avatars.com/api/?name=wangwu",
           "content": "@李四 同意，受益匪浅！",
           "likeCount": 1,
-          "isAdmin": false,
+          "isAdmin": 0,
           "createdAt": "2024-01-16T14:00:00Z"
         }
       ],
@@ -827,7 +827,7 @@ GET /posts/{articleId}/comments
 - 顶级评论按 `createdAt` 倒序（最新在前），`replies` 按 `createdAt` 正序（先回复先展示）
 - **响应不含 `email` 与 `status` 字段**：邮箱属用户隐私不对外返回；服务端只回已审核评论（过滤条件 `status=1`），该字段对外冗余
 - 未登录可读，登录时每条额外返回 `liked`（当前用户是否点赞该评论）
-- **实现状态**：后端当前 GET 实现返回分页 `PageResult`（`data` 内带 `total/page/pageSize`），需对齐为本节的**全量嵌套数组**契约
+- **`isAdmin` 为后端 `short` 类型，不是布尔值**：`0` = 普通用户，`1` = 博主（文章作者）。前端据此渲染「博主」标签（`isAdmin === 1`）
 
 ---
 
@@ -871,12 +871,10 @@ Content-Type: application/json
     "parentId": 0,
     "replyToId": 0,
     "nickname": "张三",
-    "email": "zhangsan@example.com",
     "avatar": "https://ui-avatars.com/api/?name=张三",
     "content": "我的想法是...",
     "likeCount": 0,
-    "isAdmin": false,
-    "status": 0,
+    "isAdmin": 0,
     "createdAt": "2024-01-20T14:30:00Z"
   }
 }
@@ -895,6 +893,7 @@ Content-Type: application/json
 - `parentId` 非 0 时表示回复某条评论
 - 新评论 `status` 默认为 0（待审核）
 - 评论发表成功后文章 `commentCount` +1
+- **评论发布后不可修改，只能删除**（详见下方「删除评论」）；接口不返回 `updatedAt` 之类的编辑时间字段
 
 ---
 
@@ -926,12 +925,10 @@ Authorization: Bearer {accessToken} (可选；游客可查看已审核评论)
     "parentId": 0,
     "replyToId": 0,
     "nickname": "张三",
-    "email": "zhangsan@example.com",
     "avatar": "https://ui-avatars.com/api/?name=张三",
     "content": "我的想法是...",
     "likeCount": 3,
-    "isAdmin": false,
-    "status": 1,
+    "isAdmin": 0,
     "createdAt": "2024-01-20T14:30:00Z"
   }
 }
@@ -943,64 +940,18 @@ Authorization: Bearer {accessToken} (可选；游客可查看已审核评论)
 
 **备注**
 
-- 用于编辑评论前回填内容，返回完整 `Comment` 对象
+- 返回单条评论的完整 `Comment` 对象（顶级评论的 `replies` 为空）
 
 ---
 
-### 4. 更新评论
-
-**请求**
-
-```
-PUT /posts/{articleId}/comments/{commentId}
-Authorization: Bearer {accessToken}
-Content-Type: application/json
-```
-
-**URL 参数**
-| 参数 | 类型 | 说明 |
-|-----|------|------|
-| articleId | number | 文章 ID |
-| commentId | number | 评论 ID |
-
-**入参**
-
-```json
-{
-  "content": "string (新的评论内容)"
-}
-```
-
-**返回**
-
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": {
-    "id": 100,
-    "articleId": 52,
-    "content": "修改后的内容...",
-    "...": "其余 Comment 字段"
-  }
-}
-```
-
-**错误情况**
-
-- 401: 未登录
-- 403: 只有评论作者或管理员可以编辑
-- 404: 评论不存在
-- 400: 内容为空或过长
-
-**备注**
-
-- 编辑后评论可能回到待审核状态（`status=0`），具体策略由后端决定
-- `blog_comments` 实体**没有 `updated_at` 列**，无法记录编辑时间（见末尾「实现差异与字段映射」中的设计建议）
+> **没有「更新评论」接口**：评论发布后**不可修改，只能删除**。
+> 原设计的 `PUT /posts/{articleId}/comments/{commentId}` 已废弃并从前后端移除
+> （前端 `src/api/comment.ts` 中不再提供 `updateComment`）。
+> `blog_comments` 实体没有 `updated_at` 列，本就不支持记录编辑时间。
 
 ---
 
-### 5. 删除评论
+### 4. 删除评论
 
 **请求**
 
@@ -1034,10 +985,11 @@ Authorization: Bearer {accessToken}
 **备注**
 
 - 删除后文章 `commentCount` -1
+- **评论发布后不支持编辑**：用户对已发布评论只有「删除」这一个操作入口
 
 ---
 
-### 6. 点赞评论
+### 5. 点赞评论
 
 **请求**
 
@@ -1077,7 +1029,7 @@ Authorization: Bearer {accessToken}
 
 ---
 
-### 7. 取消点赞评论
+### 6. 取消点赞评论
 
 **请求**
 
@@ -2680,7 +2632,7 @@ CREATE TABLE blog_comments (
   status TINYINT NOT NULL DEFAULT 0 COMMENT '0=待审核/默认不显示,1=通过/显示（仅二态，无拒绝态）',
   created_at DATETIME NOT NULL
   -- 注意：无 like_count 列（需从 blog_comment_likes 聚合计算）；
-  --       无 updated_at（但 API 存在 PUT 更新评论，见文末）
+  --       无 updated_at（评论发布后不可修改，只能删除，故无需记录编辑时间）
 );
 ```
 
@@ -3030,7 +2982,7 @@ JPA 默认 `Boolean` ↔ `TINYINT(1)`；前端需确保收到 `0/1` 时按布尔
 
 以下文档接口在后端**尚无控制器实现**，需补齐：
 
-- 评论：`POST /posts/{articleId}/comments`（必须登录，见 §2 契约）、`GET/PUT/DELETE /posts/{articleId}/comments/{commentId}`、评论点赞 `POST/DELETE .../like`（评论列表 `GET /posts/{articleId}/comments` 已实现）
+- 评论：`POST /posts/{articleId}/comments`（必须登录，见 §2 契约）、`GET/DELETE /posts/{articleId}/comments/{commentId}`、评论点赞 `POST/DELETE .../like`（评论列表 `GET /posts/{articleId}/comments` 已实现）。**不含 `PUT`**：评论发布后不可修改，只能删除
 - 浏览量排行：`GET /posts/top`
 
 已从本清单移除（后端已实现）：
