@@ -269,8 +269,8 @@ function formatCommentDate(dateString: string): string {
 }
 
 .user-avatar {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
@@ -353,8 +353,8 @@ function formatCommentDate(dateString: string): string {
 }
 
 .reply-avatar {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
