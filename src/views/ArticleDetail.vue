@@ -63,6 +63,8 @@
             <MDPreview :model-value="articleStore.currentArticle.contentMd" preview-only />
           </div>
 
+          <!-- 文章下方评论区（与右侧评论弹窗共用同一组件） -->
+          <CommentSection :article-id="articleId" class="below-comments" />
         </article>
       </div>
 
@@ -408,17 +410,36 @@ function formatDate(dateString: string): string {
   color: #1f2937;
 }
 
+/* 弹窗内评论区铺满剩余高度，滚动交给评论列表自身（不在这里再套一层滚动） */
 .comment-drawer-body {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-/* 评论组件自带白卡样式，放进弹窗后去掉外层卡片感 */
+/* 评论组件自带白卡样式，放进弹窗后去掉外层卡片感，并让它撑满弹窗体 */
 :deep(.comment-section) {
   margin: 0;
   padding: 0;
   background: transparent;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 标题/表单/查看全部按钮固定不压缩，列表吃掉全部剩余高度并滚动 */
+.comment-drawer-body :deep(.comment-section > *:not(.comments-list)) {
+  flex-shrink: 0;
+}
+
+.comment-drawer-body :deep(.comments-list) {
+  max-height: none; /* 覆盖组件默认 360px：弹窗里区域本来就该够高 */
+  flex: 1;
+  min-height: 0;
 }
 
 .comment-drawer-enter-active,
@@ -544,6 +565,12 @@ article {
   font-size: 15px;
   line-height: 1.8;
   color: #333;
+}
+
+/* 文章下方评论区：嵌在正文卡片底部，去圆角、加顶部分隔线 */
+.below-comments {
+  border-radius: 0;
+  border-top: 1px solid #e5e7eb;
 }
 
 .markdown-body {

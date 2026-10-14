@@ -240,6 +240,13 @@ function formatCommentDate(dateString: string): string {
   max-height: 360px;
   overflow-y: auto;
   padding-right: 4px;
+  /* 滚动照常，但隐藏右侧滚动条 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.comments-list::-webkit-scrollbar {
+  display: none;
 }
 
 /* 查看全部/收起 */
