@@ -567,8 +567,12 @@ article {
   color: #333;
 }
 
-/* 文章下方评论区：嵌在正文卡片底部，去圆角、加顶部分隔线 */
-.below-comments {
+/* 文章下方评论区：嵌在正文卡片底部。
+   左右各留 24px——与正文(article-content padding 24)一致的边距,
+   顶部分隔线也随之内缩,不贴卡片边缘 */
+.below-comments.comment-section {
+  margin: 16px 24px 0;
+  padding: 16px 0 24px;
   border-radius: 0;
   border-top: 1px solid #e5e7eb;
 }
