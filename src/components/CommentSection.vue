@@ -189,7 +189,7 @@ function formatCommentDate(dateString: string): string {
   padding: 12px;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 15px;
   font-family: inherit;
   resize: vertical;
   transition: border-color 0.3s;
@@ -269,8 +269,8 @@ function formatCommentDate(dateString: string): string {
 }
 
 .user-avatar {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
@@ -290,26 +290,26 @@ function formatCommentDate(dateString: string): string {
 .username {
   font-weight: 600;
   color: #333;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .comment-time {
-  font-size: 12px;
+  font-size: 13px;
   color: #999;
 }
 
 .comment-text {
   margin: 0 0 8px 0;
   color: #666;
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.7;
   word-break: break-word;
 }
 
 .comment-footer {
   display: flex;
   gap: 12px;
-  font-size: 12px;
+  font-size: 13px;
   color: #999;
 }
 
@@ -327,7 +327,7 @@ function formatCommentDate(dateString: string): string {
 
 .reply-count {
   cursor: default;
-  font-size: 12px;
+  font-size: 13px;
   color: #999;
 }
 
@@ -353,8 +353,8 @@ function formatCommentDate(dateString: string): string {
 }
 
 .reply-avatar {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
@@ -373,20 +373,20 @@ function formatCommentDate(dateString: string): string {
 
 .reply-username {
   font-weight: 600;
-  font-size: 13px;
+  font-size: 14px;
   color: #333;
 }
 
 .reply-time {
-  font-size: 11px;
+  font-size: 12px;
   color: #999;
 }
 
 .reply-text {
   margin: 0;
-  font-size: 13px;
+  font-size: 15px;
   color: #666;
-  line-height: 1.5;
+  line-height: 1.6;
   word-break: break-word;
 }
 
