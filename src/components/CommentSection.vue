@@ -38,9 +38,25 @@
               <el-icon><Star /></el-icon>
               {{ comment.likeCount }}
             </span>
+            <span class="reply-action" @click="startReplyToComment(comment)">回复</span>
             <span v-if="comment.replies && comment.replies.length > 0" class="reply-count">
               回复 ({{ comment.replies.length }})
             </span>
+          </div>
+          <!-- 行内回复表单：点该评论的「回复」才出现，提交即子评论 -->
+          <div v-if="replyTarget?.key === `t${comment.id}`" class="reply-form">
+            <textarea
+              v-model="replyContent"
+              :placeholder="`回复 @${replyTarget?.nickname}...`"
+              class="comment-input reply-input"
+              rows="3"
+            ></textarea>
+            <div class="reply-form-actions">
+              <el-button size="small" @click="cancelReply">取消</el-button>
+              <el-button size="small" type="primary" :disabled="!replyContent.trim() || submittingReply" @click="submitReply">
+                {{ submittingReply ? '回复中...' : '回复' }}
+              </el-button>
+            </div>
           </div>
           <!-- 嵌套回复 -->
           <div v-if="comment.replies && comment.replies.length > 0" class="replies-list">
@@ -55,6 +71,23 @@
                   <span class="reply-time">{{ formatCommentDate(reply.createdAt) }}</span>
                 </div>
                 <p class="reply-text">{{ reply.content }}</p>
+                <div class="reply-actions">
+                  <span class="reply-action" @click="startReplyToReply(comment, reply)">回复</span>
+                </div>
+                <div v-if="replyTarget?.key === `r${reply.id}`" class="reply-form">
+                  <textarea
+                    v-model="replyContent"
+                    :placeholder="`回复 @${replyTarget?.nickname}...`"
+                    class="comment-input reply-input"
+                    rows="3"
+                  ></textarea>
+                  <div class="reply-form-actions">
+                    <el-button size="small" @click="cancelReply">取消</el-button>
+                    <el-button size="small" type="primary" :disabled="!replyContent.trim() || submittingReply" @click="submitReply">
+                      {{ submittingReply ? '回复中...' : '回复' }}
+                    </el-button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -94,6 +127,7 @@ import { useCommentStore } from '@/stores/comment'
 import { useAuthStore } from '@/stores/auth'
 import { Star } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import type { Comment } from '@/types'
 
 const props = withDefaults(
   defineProps<{
@@ -183,6 +217,74 @@ function handleLikeComment(commentId: number) {
 
 function handleLogin() {
   authStore.openLoginModal()
+}
+
+// ---- 行内回复（子评论）----
+// 主表单「发布评论」始终发顶级评论（不带 parentId）；
+// 点评论/回复上的「回复」才进入此模式，提交的 parentId 指向被回复的顶级评论 → 子评论。
+interface ReplyTarget {
+  /** 唯一标识当前回复表单挂在哪条上：`t{id}`=顶级评论、`r{id}`=某条回复 */
+  key: string
+  /** 子评论挂到哪条顶级评论下（parentId 永远是顶级评论 id） */
+  parentId: number
+  /** 被回复的那条评论 id（replyToId） */
+  replyToId: number
+  nickname: string
+}
+const replyTarget = ref<ReplyTarget | null>(null)
+const replyContent = ref('')
+const submittingReply = ref(false)
+
+function startReply(comment: Comment, reply?: Comment) {
+  if (!authStore.isLoggedIn) {
+    ElMessage.warning('回复需要登录')
+    authStore.openLoginModal()
+    return
+  }
+  // 二级回复也挂在所属顶级评论下：parentId 取顶级 comment.id，replyToId 取被点的那条
+  replyTarget.value = reply
+    ? { key: `r${reply.id}`, parentId: comment.id, replyToId: reply.id, nickname: reply.nickname }
+    : { key: `t${comment.id}`, parentId: comment.id, replyToId: comment.id, nickname: comment.nickname }
+  replyContent.value = ''
+}
+
+function startReplyToComment(comment: Comment) {
+  startReply(comment)
+}
+
+function startReplyToReply(comment: Comment, reply: Comment) {
+  startReply(comment, reply)
+}
+
+function cancelReply() {
+  replyTarget.value = null
+  replyContent.value = ''
+}
+
+async function submitReply() {
+  const target = replyTarget.value
+  if (!target || !replyContent.value.trim()) return
+  submittingReply.value = true
+  try {
+    await commentStore.addComment({
+      articleId: props.articleId,
+      content: replyContent.value,
+      parentId: target.parentId,
+      replyToId: target.replyToId,
+    })
+    replyContent.value = ''
+    replyTarget.value = null
+    ElMessage.success('回复成功')
+  } catch (error: any) {
+    const message =
+      error && typeof error === 'object' && 'message' in error
+        ? String(error.message ?? '')
+        : ''
+    ElMessage.error(message || '回复失败，请重试')
+    console.error('回复失败:', error)
+  } finally {
+    submittingReply.value = false
+  }
 }
 
 /** 点击「查看全部评论」：进入无限加载模式，先放出第一批，再挂载滚动观察器 */
@@ -428,6 +530,42 @@ function formatCommentDate(dateString: string): string {
   cursor: default;
   font-size: 13px;
   color: #999;
+}
+
+/* 回复动作按钮（顶级评论 footer 与回复区共用） */
+.reply-action {
+  font-size: 13px;
+  color: #999;
+  cursor: pointer;
+  transition: color 0.3s;
+}
+
+.reply-action:hover {
+  color: #1890ff;
+}
+
+.reply-actions {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 0;
+}
+
+/* 行内回复表单：挂在被回复评论/回复的下方 */
+.reply-form {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reply-input {
+  font-size: 14px;
+}
+
+.reply-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .admin-badge {
