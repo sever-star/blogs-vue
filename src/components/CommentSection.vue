@@ -70,7 +70,13 @@
                   </span>
                   <span class="reply-time">{{ formatCommentDate(reply.createdAt) }}</span>
                 </div>
-                <p class="reply-text">{{ reply.content }}</p>
+                <p class="reply-text">
+                  <!-- 子评论回复的是同一条顶级评论下的另一条回复时，正文前标注被回复用户 -->
+                  <span v-if="replyTargetName(comment, reply)" class="reply-to">
+                    回复 @{{ replyTargetName(comment, reply) }}：
+                  </span>
+                  {{ reply.content }}
+                </p>
                 <div class="reply-actions">
                   <span class="reply-action" @click="startReplyToReply(comment, reply)">回复</span>
                 </div>
@@ -213,6 +219,19 @@ async function submitComment() {
 
 function handleLikeComment(commentId: number) {
   commentStore.likeComment(props.articleId, commentId)
+}
+
+/**
+ * 取一条子评论「回复的是谁」的昵称，用于正文前展示「回复 @X：」。
+ * - replyToId 指向顶级评论本身（直接回复顶级）时不显示，因为位置已隐含；
+ * - 指向同一条顶级评论下的另一条回复时，在该回复列表里查 nickname。
+ * 被回复对象就在已加载的本条评论的 replies 里，前端本地即可解析，无需后端字段。
+ */
+function replyTargetName(comment: Comment, reply: Comment): string | null {
+  const targetId = reply.replyToId
+  if (!targetId || targetId === comment.id) return null
+  const target = comment.replies?.find((r: Comment) => r.id === targetId)
+  return target ? target.nickname : null
 }
 
 function handleLogin() {
@@ -625,6 +644,13 @@ function formatCommentDate(dateString: string): string {
   color: #666;
   line-height: 1.6;
   word-break: break-word;
+}
+
+/* 子评论正文前的「回复 @X：」前缀 */
+.reply-to {
+  color: #1890ff;
+  font-weight: 600;
+  margin-right: 2px;
 }
 
 .no-comments {
