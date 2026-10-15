@@ -1,5 +1,5 @@
 <template>
-  <div class="comment-section">
+  <div class="comment-section" :class="`comment-section--${variant}`">
     <h3 class="section-title">评论区 ({{ comments.length }})</h3>
 
     <!-- 评论表单 -->
@@ -20,7 +20,7 @@
       <p>请 <el-button link @click="handleLogin">登录</el-button> 后发表评论</p>
     </div>
 
-    <!-- 评论列表：默认只展示 5 条，容器内下拉滚动 -->
+    <!-- 评论列表 -->
     <div class="comments-list">
       <div v-for="comment in visibleComments" :key="comment.id" class="comment-item">
         <img :src="comment.avatar" :alt="comment.nickname" class="user-avatar" />
@@ -62,13 +62,24 @@
       </div>
     </div>
 
-    <!-- 超过 5 条：展开查看全部 / 收起 -->
-    <div v-if="comments.length > PREVIEW_COUNT" class="show-all">
-      <el-button v-if="!showAll" link type="primary" @click="showAll = true">
+    <!--
+      文章下方评论区（inline）：首页文章列表同款交互——
+      默认只展示 PREVIEW_COUNT 条顶级评论，点「查看全部评论」后切到
+      「加载更多 + 无限滚动」模式，按 BATCH 逐步铺开，不再一次性全量渲染。
+      评论浮窗（drawer）则全量展示、容器内滚动，不需要这个入口。
+    -->
+    <div v-if="showEntryButton" class="show-all">
+      <el-button link type="primary" @click="expandToList">
         查看全部评论（共 {{ comments.length }} 条）
       </el-button>
-      <el-button v-else link type="primary" @click="showAll = false">收起</el-button>
     </div>
+    <template v-if="expanded && hasMore">
+      <div class="load-more">
+        <el-button :loading="loadingMore" @click="loadMore">加载更多</el-button>
+      </div>
+      <!-- 无限滚动触发器：滚入视口即加载下一批（与 Home.vue 一致） -->
+      <div ref="scrollTrigger" class="scroll-trigger"></div>
+    </template>
 
     <!-- 暂无评论 -->
     <div v-if="comments.length === 0" class="no-comments">
@@ -78,15 +89,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useCommentStore } from '@/stores/comment'
 import { useAuthStore } from '@/stores/auth'
 import { Star } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
-const props = defineProps<{
-  articleId: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    articleId: number
+    /** drawer=评论浮窗（全量展示、容器内滚动、无加载更多）；inline=文章下方（首页风格分批+无限滚动） */
+    variant?: 'drawer' | 'inline'
+  }>(),
+  { variant: 'inline' }
+)
 
 const commentStore = useCommentStore()
 const authStore = useAuthStore()
@@ -94,20 +110,39 @@ const authStore = useAuthStore()
 const newComment = ref('')
 const submitting = ref(false)
 
+// 顶级评论（已含各自嵌套 replies）
 const comments = computed(() => commentStore.getArticleComments(props.articleId))
 
-// 分页式改为下拉式：默认只展示 5 条顶级评论，点「查看全部评论」展开，
-// 列表容器固定高度内滚动（见样式 .comments-list）
+// inline 模式的分批加载状态
 const PREVIEW_COUNT = 5
-const showAll = ref(false)
+const BATCH = 10
+const expanded = ref(false)
+const displayCount = ref(PREVIEW_COUNT)
+const loadingMore = ref(false)
 
+// drawer：全量展示；inline：按 displayCount 分批
 const visibleComments = computed(() =>
-  showAll.value ? comments.value : comments.value.slice(0, PREVIEW_COUNT)
+  props.variant === 'drawer' ? comments.value : comments.value.slice(0, displayCount.value)
+)
+const hasMore = computed(() => displayCount.value < comments.value.length)
+// 仅 inline 且未展开且超过预览数时显示「查看全部评论」入口
+const showEntryButton = computed(
+  () => props.variant === 'inline' && !expanded.value && comments.value.length > PREVIEW_COUNT
 )
 
 onMounted(async () => {
   await commentStore.fetchComments(props.articleId)
 })
+
+// 切换文章时重置分批加载状态
+watch(
+  () => props.articleId,
+  () => {
+    expanded.value = false
+    displayCount.value = PREVIEW_COUNT
+    observer?.disconnect()
+  }
+)
 
 async function submitComment() {
   // 硬拦截：评论必须登录（表单虽然只对登录用户渲染，这里再兜一层防状态过期）
@@ -149,6 +184,51 @@ function handleLikeComment(commentId: number) {
 function handleLogin() {
   authStore.openLoginModal()
 }
+
+/** 点击「查看全部评论」：进入无限加载模式，先放出第一批，再挂载滚动观察器 */
+function expandToList() {
+  expanded.value = true
+  displayCount.value = Math.min(comments.value.length, PREVIEW_COUNT + BATCH)
+  nextTick(setupObserver)
+}
+
+function loadMore() {
+  loadingMore.value = true
+  displayCount.value = Math.min(comments.value.length, displayCount.value + BATCH)
+  loadingMore.value = false
+  if (!hasMore.value) observer?.disconnect()
+}
+
+// 无限滚动观察器（root=视口，与首页文章列表一致）
+let observer: IntersectionObserver | null = null
+const scrollTrigger = ref<HTMLElement>()
+
+function setupObserver() {
+  observer?.disconnect()
+  if (!scrollTrigger.value) return
+  observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && hasMore.value) loadMore()
+      })
+    },
+    { root: null, rootMargin: '100px', threshold: 0.01 }
+  )
+  observer.observe(scrollTrigger.value)
+}
+
+// 列表条数变化后（如新发评论、拉取完成）重排观察器
+watch(
+  () => comments.value.length,
+  () => {
+    nextTick(() => {
+      if (expanded.value && hasMore.value && scrollTrigger.value) setupObserver()
+      else if (!hasMore.value) observer?.disconnect()
+    })
+  }
+)
+
+onUnmounted(() => observer?.disconnect())
 
 function formatCommentDate(dateString: string): string {
   const date = new Date(dateString)
@@ -249,12 +329,31 @@ function formatCommentDate(dateString: string): string {
   display: none;
 }
 
+/* inline（文章下方，首页风格）：列表随页面增长，分批加载，不分页滚动 */
+.comment-section--inline .comments-list {
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
 /* 查看全部/收起 */
 .show-all {
   margin-top: 12px;
   padding-top: 8px;
   border-top: 1px dashed #e5e7eb;
   text-align: center;
+}
+
+/* 加载更多 + 无限滚动触发器（与 Home.vue 一致） */
+.load-more {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.scroll-trigger {
+  height: 1px;
+  visibility: hidden;
 }
 
 .comment-item {

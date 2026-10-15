@@ -63,8 +63,8 @@
             <MDPreview :model-value="articleStore.currentArticle.contentMd" preview-only />
           </div>
 
-          <!-- 文章下方评论区（与右侧评论弹窗共用同一组件） -->
-          <CommentSection :article-id="articleId" class="below-comments" />
+          <!-- 文章下方评论区：首页文章列表同款（默认 5 条 + 查看全部评论后无限加载） -->
+          <CommentSection :article-id="articleId" variant="inline" class="below-comments" />
         </article>
       </div>
 
@@ -129,7 +129,11 @@
       </aside>
     </div>
 
-    <!-- 右侧评论弹窗：贴视口右缘，宽 320px——≥1200px 视口下正好覆盖作者栏区域，不遮正文 -->
+    <!-- 右侧评论弹窗：贴视口右缘，宽 370px——≥1200px 视口下正好覆盖作者栏区域，不遮正文 -->
+    <!-- 弹窗展开时主页罩一层半透明遮罩做亮度区分，点遮罩即收起 -->
+    <transition name="comment-overlay">
+      <div v-if="commentOpen" class="comment-overlay" @click="commentOpen = false"></div>
+    </transition>
     <transition name="comment-drawer">
       <aside v-if="commentOpen && articleStore.currentArticle" class="comment-drawer">
         <div class="comment-drawer-header">
@@ -139,7 +143,7 @@
           </el-button>
         </div>
         <div class="comment-drawer-body">
-          <CommentSection :article-id="articleId" />
+          <CommentSection :article-id="articleId" variant="drawer" />
         </div>
       </aside>
     </transition>
@@ -380,6 +384,28 @@ function formatDate(dateString: string): string {
 }
 
 /* ---- 右侧评论弹窗 ---- */
+
+/* 弹窗展开时罩在主页上的半透明遮罩：略微降低主页亮度做层次区分，点击即收起 */
+.comment-overlay {
+  position: fixed;
+  top: 70px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 999;
+  cursor: pointer;
+}
+
+.comment-overlay-enter-active,
+.comment-overlay-leave-active {
+  transition: opacity 0.25s ease;
+}
+
+.comment-overlay-enter-from,
+.comment-overlay-leave-to {
+  opacity: 0;
+}
 
 .comment-drawer {
   position: fixed;
