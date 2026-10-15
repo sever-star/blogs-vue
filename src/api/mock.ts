@@ -601,17 +601,15 @@ const routes: Record<string, (url: string, data?: any, params?: any) => AxiosRes
     return ok({ favCount: a.favCount })
   },
 
-  // ---- 评论列表 ----
-  [R('GET', /^\/posts\/(\d+)\/comments$/)]: (url, _, params) => {
+  // ---- 评论列表（全量嵌套，与真实后端 GET /posts/{id}/comments 一致）----
+  [R('GET', /^\/posts\/(\d+)\/comments$/)]: (url) => {
     const articleId = extractArticleId(url, /^\/posts\/(\d+)\/comments$/)
     const all = getComments(articleId)
-    const page = Number(params?.page) || 1
-    const ps = Number(params?.pageSize) || 20
-    const total = all.length
-    return ok({
-      data: all.slice((page - 1) * ps, page * ps),
-      total, page, pageSize: ps, totalPages: Math.ceil(total / ps),
-    } as PaginatedResponse<Comment>)
+    // 顶级评论 + 嵌套 replies，parentId 为 null/0 视为顶级
+    const nested = all
+      .filter(c => !c.parentId)
+      .map(top => ({ ...top, replies: all.filter(r => r.parentId === top.id) }))
+    return ok(nested)
   },
 
   // ---- 发表评论 ----

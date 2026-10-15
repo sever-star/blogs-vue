@@ -1,17 +1,17 @@
 import client from './client'
-import type { Comment, CommentPayload, CommentQueryParams, PaginatedResponse } from '@/types'
+import type { Comment, CommentPayload } from '@/types'
 
-export type { CommentPayload, CommentQueryParams }
+export type { CommentPayload }
 
 /**
- * 获取文章评论列表（分页）
+ * 获取文章评论列表（全量，不分页）
  * GET /posts/{articleId}/comments
+ *
+ * 后端返回顶级评论数组，每条在其 `replies` 内嵌套二级回复；
+ * 前端 store 会将其扁平化存入缓存以便按 id 查找。
  */
-export const getComments = async (
-  articleId: number,
-  params?: CommentQueryParams
-): Promise<PaginatedResponse<Comment>> => {
-  return client.get(`/posts/${articleId}/comments`, { params })
+export const getComments = async (articleId: number): Promise<Comment[]> => {
+  return client.get(`/posts/${articleId}/comments`)
 }
 
 /**

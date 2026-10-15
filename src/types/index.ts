@@ -87,15 +87,15 @@ export interface Comment {
   id: number
   articleId: number
   userId: number | null
-  parentId: number
-  replyToId: number
+  parentId: number | null
+  replyToId: number | null
   nickname: string
-  email: string
+  email?: string
   avatar: string
   content: string
   likeCount: number
   isAdmin: number // 0=普通用户 1=博主（后端返回 short）
-  status: number
+  status?: number
   createdAt: string
   replies?: Comment[]
   liked?: boolean

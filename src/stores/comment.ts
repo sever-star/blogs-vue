@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Comment, CommentPayload } from '@/types'
+import { getComments as getCommentsApi, submitComment as submitCommentApi } from '@/api/comment'
 
 export type { Comment }
 
@@ -9,86 +10,22 @@ export const useCommentStore = defineStore('comment', () => {
   const commentMap = ref<Map<number, Comment[]>>(new Map())
   const loading = ref(false)
 
-  // ========== Mock 数据 (开发阶段使用) ==========
-
-  const generateMockComments = (articleId: number): Comment[] => {
-    return [
-      {
-        id: 1,
-        articleId: articleId,
-        userId: 1,
-        parentId: 0,
-        replyToId: 0,
-        nickname: '张三',
-        email: 'zhangsan@example.com',
-        avatar: 'https://ui-avatars.com/api/?name=zhangsan&background=0D8ABC&color=fff',
-        content: '这是一篇很不错的文章，学到了很多东西，感谢分享！',
-        likeCount: 5,
-        isAdmin: 0,
-        status: 1,
-        createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: 2,
-        articleId: articleId,
-        userId: 2,
-        parentId: 0,
-        replyToId: 0,
-        nickname: '李四',
-        email: 'lisi@example.com',
-        avatar: 'https://ui-avatars.com/api/?name=lisi&background=FF9F43&color=fff',
-        content: '期待更多相关的深入讲解，这方面的教程很稀缺。',
-        likeCount: 2,
-        isAdmin: 0,
-        status: 1,
-        createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: 3,
-        articleId: articleId,
-        userId: null,
-        parentId: 1,
-        replyToId: 1,
-        nickname: '游客',
-        email: 'guest@example.com',
-        avatar: 'https://ui-avatars.com/api/?name=guest&background=random&color=fff',
-        content: '@张三 同意，受益匪浅！',
-        likeCount: 1,
-        isAdmin: 0,
-        status: 1,
-        createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: 4,
-        articleId: articleId,
-        userId: null,
-        parentId: 1,
-        replyToId: 1,
-        nickname: '博主',
-        email: 'admin@example.com',
-        avatar: 'https://ui-avatars.com/api/?name=admin&background=purple&color=fff',
-        content: '@张三 感谢你的支持！后续会继续分享更多相关内容。',
-        likeCount: 0,
-        isAdmin: 1,
-        status: 1,
-        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      },
-    ]
-  }
-
   // ========== 方法 ==========
 
-  /** 获取文章评论列表 */
+  /** 获取文章评论列表（从后端拉取全量嵌套数据，扁平化后存入缓存） */
   const fetchComments = async (articleId: number): Promise<Comment[]> => {
     loading.value = true
     try {
-      // TODO: 接入真实 API: GET /posts/{articleId}/comments
-      if (!commentMap.value.has(articleId)) {
-        const mockComments = generateMockComments(articleId)
-        commentMap.value.set(articleId, mockComments)
+      const nested = await getCommentsApi(articleId)
+      // 后端返回顶级评论（每条内嵌 replies）；扁平化以便点赞/删除等按 id 查找逻辑复用
+      const flat: Comment[] = []
+      for (const top of nested ?? []) {
+        flat.push(top)
+        if (top.replies?.length) flat.push(...top.replies)
       }
-      comments.value = commentMap.value.get(articleId) || []
-      return comments.value
+      commentMap.value.set(articleId, flat)
+      comments.value = flat
+      return flat
     } catch (error) {
       console.error('获取评论失败:', error)
       return []
@@ -101,45 +38,34 @@ export const useCommentStore = defineStore('comment', () => {
   const getArticleComments = (articleId: number): Comment[] => {
     const all = commentMap.value.get(articleId) || []
     // 构建嵌套结构：顶级评论 + replies
-    const topLevel = all.filter(c => c.parentId === 0)
+    // 后端顶级评论 parentId 可能为 null 或 0（DB 默认 NULL），两者都视为顶级
+    const topLevel = all.filter(c => !c.parentId)
     return topLevel.map(comment => ({
       ...comment,
       replies: all.filter(c => c.parentId === comment.id),
     }))
   }
 
-  /** 添加评论 */
+  /** 发表评论（调用后端 POST，成功后写入本地缓存） */
   const addComment = async (payload: CommentPayload & { articleId: number }): Promise<Comment | null> => {
     try {
-      // TODO: 接入真实 API: POST /posts/{articleId}/comments
-      // return await submitCommentApi(payload)
-
-      const newComment: Comment = {
-        id: Math.floor(Math.random() * 100000),
-        articleId: payload.articleId,
-        userId: Math.random() > 0.5 ? 1 : null,
-        parentId: payload.parentId || 0,
-        replyToId: payload.replyToId || 0,
-        nickname: payload.nickname || '游客',
-        email: payload.email || '',
-        avatar: `https://ui-avatars.com/api/?name=${payload.nickname || 'guest'}&background=random&color=fff`,
+      const created = await submitCommentApi(payload.articleId, {
         content: payload.content,
-        likeCount: 0,
-        isAdmin: 0,
-        status: 0,
-        createdAt: new Date().toISOString(),
-      }
+        parentId: payload.parentId,
+        replyToId: payload.replyToId,
+      })
 
       if (!commentMap.value.has(payload.articleId)) {
         commentMap.value.set(payload.articleId, [])
       }
-      const articleComments = commentMap.value.get(payload.articleId)!
-      articleComments.unshift(newComment)
-
-      return newComment
-    } catch (error) {
+      // 新评论插到顶级最前；回复（parentId 非 0）也先进扁平缓存，
+      // 由 getArticleComments 按 parentId 重新组织嵌套
+      commentMap.value.get(payload.articleId)!.unshift(created)
+      return created
+    } catch (error: any) {
       console.error('发表评论失败:', error)
-      return null
+      // 透出后端原因（401 未登录 / 内容过长 / 文章不允许评论等），交由组件提示
+      throw error
     }
   }
 
