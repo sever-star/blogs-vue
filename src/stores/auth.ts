@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import type { User } from '@/types'
 import {
   getCurrentUser as getCurrentUserApi,
@@ -157,6 +158,13 @@ export const useAuthStore = defineStore('auth', () => {
   if (sessionStorage.getItem('auth:require-login') === '1') {
     sessionStorage.removeItem('auth:require-login')
     showLoginModal.value = true
+  }
+
+  // 强制登出原因（如「账号已被禁用」）：整页跳转前暂存于 sessionStorage，这里读出弹提示
+  const logoutReason = sessionStorage.getItem('auth:logout-reason')
+  if (logoutReason) {
+    sessionStorage.removeItem('auth:logout-reason')
+    ElMessage.error(logoutReason)
   }
 
   return {

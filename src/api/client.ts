@@ -88,10 +88,12 @@ function retryWithToken(config: RetryableConfig, token: string) {
   return client(config)
 }
 
-function forceLogout() {
+function forceLogout(reason?: string) {
   removeAccessToken()
   // 标记「需要重新登录」，全量刷新回首页后由 auth store 初始化时自动弹出登录框
   sessionStorage.setItem('auth:require-login', '1')
+  // 整页跳转会冲掉即时 toast，故把原因暂存到 sessionStorage，由 auth store 在 reload 后弹出
+  if (reason) sessionStorage.setItem('auth:logout-reason', reason)
   window.location.href = '/'
 }
 
@@ -135,13 +137,15 @@ client.interceptors.response.use(
 
     // 刷新请求本身失败 → refresh token 也无效/过期，强制登出
     if (config.url === '/auth/refresh') {
-      forceLogout()
+      forceLogout('登录已过期，请重新登录')
       return Promise.reject(error)
     }
 
-    // 已经重试过一次仍 401 → 新 token 也被拒，强制登出
+    // 已经重试过一次仍 401 → 新 token 也被拒。
+    // 这条路径几乎只在「账号被禁用」时出现：refresh 接口不查状态会成功发新 token，
+    // 但过滤器按 status=0 拦掉重试请求 → 命中此分支。给一个明确的提示而非静默登出。
     if (config._retry) {
-      forceLogout()
+      forceLogout('账号已被禁用或登录状态已失效，请重新登录')
       return Promise.reject(error)
     }
 
@@ -173,7 +177,7 @@ client.interceptors.response.use(
       pendingQueue.forEach(({ reject }) => reject(refreshError))
       pendingQueue = []
       isRefreshing = false
-      forceLogout()
+      forceLogout('登录已失效，请重新登录')
       return Promise.reject(refreshError)
     }
   }
