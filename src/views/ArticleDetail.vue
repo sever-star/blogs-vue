@@ -385,10 +385,11 @@ function formatDate(dateString: string): string {
 
 /* ---- 右侧评论弹窗 ---- */
 
-/* 弹窗展开时罩在主页上的半透明遮罩：略微降低主页亮度做层次区分，点击即收起 */
+/* 弹窗展开时罩在主页上的半透明遮罩：略微降低主页亮度做层次区分，点击即收起。
+   从视口顶部起覆盖（含页头），与浮窗顶部对齐 */
 .comment-overlay {
   position: fixed;
-  top: 70px;
+  top: 0;
   left: 0;
   right: 0;
   bottom: 0;
@@ -409,7 +410,7 @@ function formatDate(dateString: string): string {
 
 .comment-drawer {
   position: fixed;
-  top: 70px;
+  top: 0;
   right: 0;
   bottom: 0;
   width: 370px;
