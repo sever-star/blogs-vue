@@ -39,6 +39,13 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   },
   {
+    // 站内通知（从头像菜单/铃铛「查看全部」进入）
+    path: '/notifications',
+    name: 'Notifications',
+    component: () => import('@/views/Notifications.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/article/:id',
     name: 'ArticleDetail',
     component: () => import('@/views/ArticleDetail.vue'),

@@ -101,6 +101,32 @@ export interface Comment {
   liked?: boolean
 }
 
+// ============ 通知 ============
+
+/** 站内通知类型 */
+export type NotificationType =
+  | 'post_comment' // 有人评论你的文章
+  | 'comment_reply' // 有人回复你的评论
+  | 'comment_like' // 有人点赞你的评论
+  | 'like' // 有人点赞你的文章
+  | 'favorite' // 有人收藏你的文章
+  | 'follow' // 有人关注你
+  | 'message' // 收到私信
+  | 'system' // 系统通知
+
+/** 站内通知（content 已由后端拼好，直接展示） */
+export interface Notification {
+  id: number
+  type: NotificationType
+  title: string
+  content: string
+  /** 跳转链接，如 /article/5 或 /article/5#comment-12 */
+  link: string
+  /** 0=未读 1=已读（后端 short） */
+  isRead: number
+  createdAt: string
+}
+
 // ============ 请求体 ============
 
 /** 登录请求 */

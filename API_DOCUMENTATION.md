@@ -2399,6 +2399,115 @@ Authorization: Bearer {accessToken}
 
 ---
 
+## 站内通知接口
+
+### 1. 通知列表
+
+**请求**
+
+```
+GET /notifications?page=1&pageSize=10&onlyUnread=false
+Authorization: Bearer {accessToken}
+```
+
+**Query 参数**
+
+| 参数 | 类型 | 必需 | 说明 |
+|-----|------|------|------|
+| page | number | 否 | 页码，默认 1 |
+| pageSize | number | 否 | 每页条数，默认 10 |
+| onlyUnread | boolean | 否 | 只看未读，默认 false |
+
+**返回**（`PageResult` 结构）
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "data": [
+      {
+        "id": 12,
+        "type": "post_comment",
+        "title": "文章评论",
+        "content": "张三 评论了你的文章《Vue3 指南》",
+        "link": "/article/5",
+        "isRead": 0,
+        "createdAt": "2026-10-16T10:20:30"
+      }
+    ],
+    "total": 3,
+    "page": 1,
+    "pageSize": 10,
+    "totalPages": 1
+  }
+}
+```
+
+**错误情况**
+
+- 401 未登录
+
+**备注**
+
+- 仅返回**当前登录用户**自己的通知，按 `createdAt` 倒序
+- `content` 已在生成时拼好触发者昵称（如「张三 回复了你的评论」），前端直接展示
+- 评论类通知 `link` 带锚点 `/article/{id}#comment-{commentId}`，跳转后定位到具体评论
+- `type` 枚举：`post_comment`（评论文章）/ `comment_reply`（回复评论）/ `comment_like`（评论被赞）/ `like`（文章被赞）/ `favorite`（文章被收藏）/ `follow`（被关注）/ `message`（收到私信）/ `system`（系统）
+- 触发时机：评论成功、评论点赞成功、文章点赞成功（关注/私信/收藏模块上线后各自触发）；自己触发自己的动作不生成（防自扰）
+
+---
+
+### 2. 未读数
+
+```
+GET /notifications/unread-count
+Authorization: Bearer {accessToken}
+```
+
+**返回**
+
+```json
+{ "code": 200, "message": "操作成功", "data": { "count": 3 } }
+```
+
+---
+
+### 3. 标记单条已读
+
+```
+PUT /notifications/{id}/read
+Authorization: Bearer {accessToken}
+```
+
+**返回**：`{ "code": 200 }`
+
+**错误情况**
+
+- 401 未登录；404（业务码 401 消息体）通知不存在或非本人
+
+---
+
+### 4. 全部标记已读
+
+```
+PUT /notifications/read-all
+Authorization: Bearer {accessToken}
+```
+
+**返回**：`{ "code": 200 }`
+
+---
+
+### 前端接入约定
+
+- 顶部导航铃铛（`Header.vue`，登录态显示）：进入页面拉一次 `unread-count` 展示红点，**点开弹层再拉列表**；不做轮询、无 WebSocket（实时性要求不高）
+- 铃铛弹层按分类 tab 前端过滤：全部 / 评论通知 / 点赞收藏 / 关注 / 私信 / 系统
+- 点某条：先 `PUT .../read` 再 `router.push(link)` 跳转到对应文章/评论位置
+- 「查看全部」进入 `/notifications` 列表页（`requiresAuth`）
+
+---
+
 ## 前端请求示例
 
 ### 使用 axios 发起请求
