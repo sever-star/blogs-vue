@@ -885,7 +885,7 @@ Content-Type: application/json
 - 401: 未登录（评论必须登录，由前端强制；后端接口就绪后应同样校验）
 - 404: 文章不存在
 - 400: 评论内容为空或过长
-- 400: 文章不允许评论 (`allowComment` = false)
+- 400: 文章不允许评论 (`allowComment` = 0)
 
 **备注**
 
@@ -2323,8 +2323,9 @@ GET /posts/top?limit=10
       "summary": "深入了解 Vue 3 的 Composition API...",
       "coverImage": "https://picsum.photos/800/400?random=1",
       "viewCount": 1250,
-      "authorNickname": "张三",
-      "authorAvatar": "https://example.com/avatar.jpg"
+      "likeCount": 36,
+      "favCount": 12,
+      "status": 1
     }
   ]
 }
@@ -2337,11 +2338,11 @@ GET /posts/top?limit=10
 **备注**
 
 - 不需要认证
-- **状态：后端暂无此接口**（见 §5 未实现清单）；前端首页排行当前用 `GET /posts` 列表按 `viewCount` 本地排序替代，后端实现后切回本接口
+- 已实现：`GET /posts/top`，`limit` 走 Query 参数，后端用 SQL `LIMIT` 截断（默认 10）
 - 按 `viewCount` 降序返回前 N 条（默认 10 条）
-- 仅返回已发布文章（status=1）
+- 仅返回已发布文章（status=1）且未软删
+- 仅查 `blog_posts` 单表：返回其自有列（`ArticleListItem` 中 `authorNickname`/`authorAvatar`/`category`/`tags` 等关联字段为 null，响应 `NON_NULL` 会被省略）；首页排行侧栏只用 `title` + `viewCount`，足够
 - 用于首页右侧「热门排行」侧栏，仅在「全部」标签时展示
-- 返回字段为 `ArticleListItem` 结构（不含 `contentMd` / `contentHtml`）
 
 ---
 
