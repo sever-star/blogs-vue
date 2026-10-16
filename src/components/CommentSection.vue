@@ -34,8 +34,12 @@
           </div>
           <p class="comment-text">{{ comment.content }}</p>
           <div class="comment-footer">
-            <span class="like-btn" @click="handleLikeComment(comment.id)">
-              <el-icon><Star /></el-icon>
+            <span
+              class="like-btn"
+              :class="{ 'is-liked': comment.liked }"
+              @click="handleLike(comment)"
+            >
+              <el-icon><StarFilled v-if="comment.liked" /><Star v-else /></el-icon>
               {{ comment.likeCount }}
             </span>
             <span class="reply-action" @click="startReplyToComment(comment)">回复</span>
@@ -78,6 +82,14 @@
                   {{ reply.content }}
                 </p>
                 <div class="reply-actions">
+                  <span
+                    class="like-btn"
+                    :class="{ 'is-liked': reply.liked }"
+                    @click="handleLike(reply)"
+                  >
+                    <el-icon><StarFilled v-if="reply.liked" /><Star v-else /></el-icon>
+                    {{ reply.likeCount }}
+                  </span>
                   <span class="reply-action" @click="startReplyToReply(comment, reply)">回复</span>
                 </div>
                 <div v-if="replyTarget?.key === `r${reply.id}`" class="reply-form">
@@ -131,7 +143,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useCommentStore } from '@/stores/comment'
 import { useAuthStore } from '@/stores/auth'
-import { Star } from '@element-plus/icons-vue'
+import { Star, StarFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { Comment } from '@/types'
 
@@ -217,8 +229,30 @@ async function submitComment() {
   }
 }
 
-function handleLikeComment(commentId: number) {
-  commentStore.likeComment(props.articleId, commentId)
+// 正在点赞的评论 id，请求期间禁用该条点赞按钮，防重复提交触发「您已点赞/未点赞」
+const likingId = ref<number | null>(null)
+
+/** 点赞/取消点赞（顶级评论与子评论共用）：按当前 liked 状态切换，失败透出原因 */
+async function handleLike(comment: Comment) {
+  if (!authStore.isLoggedIn) {
+    ElMessage.warning('请先登录后再点赞')
+    authStore.openLoginModal()
+    return
+  }
+  if (likingId.value !== null) return
+  likingId.value = comment.id
+  try {
+    await commentStore.toggleLike(props.articleId, comment.id)
+  } catch (error: any) {
+    const message =
+      error && typeof error === 'object' && 'message' in error
+        ? String(error.message ?? '')
+        : ''
+    ElMessage.error(message || '操作失败，请重试')
+    console.error('评论点赞失败:', error)
+  } finally {
+    likingId.value = null
+  }
 }
 
 /**
@@ -543,6 +577,15 @@ function formatCommentDate(dateString: string): string {
 
 .like-btn:hover {
   color: #1890ff;
+}
+
+/* 已点赞：实心星标 + 金色强调 */
+.like-btn.is-liked {
+  color: #f7ba2a;
+}
+
+.like-btn.is-liked:hover {
+  color: #f7ba2a;
 }
 
 .reply-count {

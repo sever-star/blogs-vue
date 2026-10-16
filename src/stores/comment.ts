@@ -1,7 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Comment, CommentPayload } from '@/types'
-import { getComments as getCommentsApi, submitComment as submitCommentApi } from '@/api/comment'
+import {
+  getComments as getCommentsApi,
+  submitComment as submitCommentApi,
+  likeComment as likeCommentApi,
+  unlikeComment as unlikeCommentApi,
+} from '@/api/comment'
 
 export type { Comment }
 
@@ -69,32 +74,19 @@ export const useCommentStore = defineStore('comment', () => {
     }
   }
 
-  /** 点赞评论 */
-  const likeComment = async (articleId: number, commentId: number) => {
-    try {
-      // TODO: 接入真实 API: POST /posts/{articleId}/comments/{commentId}/like
-      const articleComments = commentMap.value.get(articleId) || []
-      const comment = articleComments.find(c => c.id === commentId)
-      if (comment) {
-        comment.likeCount += 1
-      }
-    } catch (error) {
-      console.error('点赞评论失败:', error)
-    }
-  }
-
-  /** 取消点赞评论 */
-  const unlikeComment = async (articleId: number, commentId: number) => {
-    try {
-      // TODO: 接入真实 API: DELETE /posts/{articleId}/comments/{commentId}/like
-      const articleComments = commentMap.value.get(articleId) || []
-      const comment = articleComments.find(c => c.id === commentId)
-      if (comment && comment.likeCount > 0) {
-        comment.likeCount -= 1
-      }
-    } catch (error) {
-      console.error('取消点赞失败:', error)
-    }
+  /** 切换评论点赞状态：未赞→点赞，已赞→取消点赞。
+   *  后端返回点赞后的真实 likeCount，直接覆盖本地缓存；
+   *  liked 同时翻转。失败时抛错交由组件提示（未登录/已点赞/未点赞等）。 */
+  const toggleLike = async (articleId: number, commentId: number): Promise<void> => {
+    const articleComments = commentMap.value.get(articleId) || []
+    const comment = articleComments.find(c => c.id === commentId)
+    if (!comment) return
+    const wasLiked = !!comment.liked
+    const res = wasLiked
+      ? await unlikeCommentApi(articleId, commentId)
+      : await likeCommentApi(articleId, commentId)
+    comment.likeCount = res.likeCount
+    comment.liked = !wasLiked
   }
 
   /** 删除评论 */
@@ -129,8 +121,7 @@ export const useCommentStore = defineStore('comment', () => {
     fetchComments,
     getArticleComments,
     addComment,
-    likeComment,
-    unlikeComment,
+    toggleLike,
     deleteComment,
     clearCommentCache,
   }
