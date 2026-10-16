@@ -105,6 +105,7 @@
               v-for="(a, i) in articleStore.topViewedArticles"
               :key="a.id"
               class="ranking-item"
+              @click="openArticle(a.id)"
             >
               <span class="rank" :class="{ top: i < 3 }">{{ i + 1 }}</span>
               <div class="rank-info">
@@ -121,12 +122,19 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { useArticleStore } from '@/stores/article'
 import { ElMessage } from 'element-plus'
 import ArticleCard from '@/components/ArticleCard.vue'
 import { Document, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 
 const articleStore = useArticleStore()
+const router = useRouter()
+
+/** 点击热门排行项 → 打开文章详情（同标签页跳转，与侧栏「点进去读」的直觉一致） */
+function openArticle(id: number) {
+  router.push({ name: 'ArticleDetail', params: { id } })
+}
 const scrollTrigger = ref<HTMLElement>()
 
 // 计算所有标签，包括"全部"
@@ -431,6 +439,16 @@ function handleLoadMore() {
   gap: 10px;
   padding: 10px 0;
   border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.ranking-item:hover {
+  background-color: #f9fafb;
+}
+
+.ranking-item:hover .rank-title {
+  color: #1890ff;
 }
 
 .ranking-item:last-child {
