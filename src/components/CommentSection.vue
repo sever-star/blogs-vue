@@ -39,7 +39,10 @@
               :class="{ 'is-liked': comment.liked }"
               @click="handleLike(comment)"
             >
-              <el-icon><StarFilled v-if="comment.liked" /><Star v-else /></el-icon>
+              <!-- 与文章点赞同款大拇指 SVG：fill=currentColor 跟随 is-liked 金色/默认灰 -->
+              <svg class="thumb-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z" />
+              </svg>
               {{ comment.likeCount }}
             </span>
             <span class="reply-action" @click="startReplyToComment(comment)">回复</span>
@@ -87,7 +90,9 @@
                     :class="{ 'is-liked': reply.liked }"
                     @click="handleLike(reply)"
                   >
-                    <el-icon><StarFilled v-if="reply.liked" /><Star v-else /></el-icon>
+                    <svg class="thumb-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z" />
+                    </svg>
                     {{ reply.likeCount }}
                   </span>
                   <span class="reply-action" @click="startReplyToReply(comment, reply)">回复</span>
@@ -143,7 +148,6 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useCommentStore } from '@/stores/comment'
 import { useAuthStore } from '@/stores/auth'
-import { Star, StarFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { Comment } from '@/types'
 
@@ -573,6 +577,12 @@ function formatCommentDate(dateString: string): string {
   gap: 4px;
   cursor: pointer;
   transition: color 0.3s;
+}
+
+/* 大拇指图标：尺寸跟随 .like-btn 字号（1em），颜色走 currentColor */
+.thumb-icon {
+  width: 1em;
+  height: 1em;
 }
 
 .like-btn:hover {
