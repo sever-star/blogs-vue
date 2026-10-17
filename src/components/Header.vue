@@ -37,13 +37,15 @@
 
         <!-- Auth section -->
         <div class="auth-section">
-          <!-- 站内通知铃铛（仅登录）：进入页面拉一次未读数，点开再拉列表，不轮询 -->
+          <!-- 站内通知铃铛（仅登录）：悬浮弹出五个分类快捷入口，点击跳通知页对应模块；
+               点铃铛本体进入全部通知。未读数进入页面拉一次，不轮询 -->
           <el-popover
             v-if="isLoggedIn"
-            v-model:visible="notifPopoverVisible"
             placement="bottom-end"
-            trigger="click"
-            :width="340"
+            trigger="hover"
+            :width="190"
+            :open-delay="150"
+            :close-delay="200"
             popper-class="notif-popper"
           >
             <template #reference>
@@ -53,55 +55,22 @@
                 :max="99"
                 class="notif-bell"
               >
-                <el-button class="bell-btn" text circle @click="handleBellClick">
+                <el-button class="bell-btn" text circle @click="goNotifications()">
                   <el-icon :size="20"><Bell /></el-icon>
                 </el-button>
               </el-badge>
             </template>
 
-            <div class="notif-panel">
-              <div class="notif-tabs">
-                <span
-                  v-for="tab in NOTIFICATION_TABS"
-                  :key="tab.key"
-                  class="notif-tab"
-                  :class="{ active: notifStore.activeTab === tab.key }"
-                  @click="notifStore.activeTab = tab.key"
-                >
-                  {{ tab.label }}
-                </span>
-              </div>
-
-              <div class="notif-list" v-loading="notifStore.loading">
-                <div
-                  v-for="n in notifStore.visibleList()"
-                  :key="n.id"
-                  class="notif-item"
-                  :class="{ unread: n.isRead === 0 }"
-                  @click="handleNotifClick(n)"
-                >
-                  <span class="notif-dot" v-if="n.isRead === 0"></span>
-                  <span class="notif-dot notif-dot--read" v-else></span>
-                  <div class="notif-body">
-                    <p class="notif-content">{{ n.content }}</p>
-                    <span class="notif-time">{{ formatNotifTime(n.createdAt) }}</span>
-                  </div>
-                </div>
-
-                <el-empty
-                  v-if="!notifStore.loading && notifStore.visibleList().length === 0"
-                  description="暂无通知"
-                  :image-size="60"
-                />
-              </div>
-
-              <div class="notif-footer">
-                <el-button link type="primary" size="small" @click="handleMarkAllRead">
-                  全部已读
-                </el-button>
-                <el-button link type="primary" size="small" @click="goNotifications">
-                  查看全部
-                </el-button>
+            <div class="notif-quick-menu">
+              <div
+                v-for="entry in NOTIF_QUICK_ENTRIES"
+                :key="entry.tab"
+                class="notif-quick-item"
+                @click="goNotifications(entry.tab)"
+              >
+                <el-icon><component :is="entry.icon" /></el-icon>
+                <span>{{ entry.label }}</span>
+                <el-icon class="quick-arrow"><ArrowRight /></el-icon>
               </div>
             </div>
           </el-popover>
@@ -177,20 +146,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
-import { useNotificationStore, NOTIFICATION_TABS } from '@/stores/notification'
-import type { Notification } from '@/types'
+import { useNotificationStore } from '@/stores/notification'
+import type { NotificationTab } from '@/stores/notification'
 import { ElMessage } from 'element-plus'
 import {
   ArrowDown,
+  ArrowRight,
   User,
   Document,
   Setting,
   SwitchButton,
   Bell,
+  ChatDotRound,
+  Star,
+  Message,
+  InfoFilled,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -199,38 +173,19 @@ const notifStore = useNotificationStore()
 const { isLoggedIn, isAdmin, user, showLoginModal } = storeToRefs(authStore)
 
 // ---- 站内通知铃铛 ----
-const notifPopoverVisible = ref(false)
 
-/** 点开铃铛才拉列表（未读数进入页面已拉过一次，这里不重复轮询） */
-async function handleBellClick() {
-  await notifStore.fetchList()
-}
+/** 悬浮弹层的五个分类快捷入口（不含「全部」，点铃铛本体即全部） */
+const NOTIF_QUICK_ENTRIES: Array<{ tab: Exclude<NotificationTab, 'all'>; label: string; icon: unknown }> = [
+  { tab: 'comment', label: '评论通知', icon: ChatDotRound },
+  { tab: 'like', label: '点赞收藏', icon: Star },
+  { tab: 'follow', label: '关注', icon: User },
+  { tab: 'message', label: '私信', icon: Message },
+  { tab: 'system', label: '系统', icon: InfoFilled },
+]
 
-/** 点某条通知：标记已读并跳转到对应文章/评论位置 */
-async function handleNotifClick(n: Notification) {
-  await notifStore.markRead(n)
-  notifPopoverVisible.value = false
-  if (n.link) {
-    router.push(n.link)
-  }
-}
-
-async function handleMarkAllRead() {
-  await notifStore.markAllRead()
-}
-
-function goNotifications() {
-  notifPopoverVisible.value = false
-  router.push('/notifications')
-}
-
-function formatNotifTime(time: string): string {
-  return new Date(time).toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+/** 跳转通知页并预选模块（tab 为空即全部） */
+function goNotifications(tab?: NotificationTab) {
+  router.push({ name: 'Notifications', query: tab ? { tab } : {} })
 }
 
 // 进入页面拉一次未读数（登录态恢复后）；登出时清空
@@ -398,105 +353,37 @@ const handleCommand = (command: string) => {
   color: #3b82f6;
 }
 
-.notif-panel {
+/* 悬浮弹层：五个分类快捷入口 */
+.notif-quick-menu {
   display: flex;
   flex-direction: column;
-  max-height: 420px;
 }
 
-.notif-tabs {
+.notif-quick-item {
   display: flex;
-  gap: 4px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #f3f4f6;
-  flex-wrap: wrap;
-}
-
-.notif-tab {
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
   font-size: 13px;
-  color: #6b7280;
-  padding: 3px 10px;
-  border-radius: 999px;
+  color: #374151;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
-.notif-tab:hover {
+.notif-quick-item:hover {
   background: #f3f4f6;
-}
-
-.notif-tab.active {
-  background: #ecf5ff;
   color: #3b82f6;
-  font-weight: 500;
 }
 
-.notif-list {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 80px;
-  max-height: 300px;
-}
-
-.notif-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 10px 6px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.notif-item:hover {
-  background: #f9fafb;
-}
-
-.notif-dot {
-  flex-shrink: 0;
-  width: 6px;
-  height: 6px;
-  margin-top: 7px;
-  border-radius: 50%;
-  background: #3b82f6;
-}
-
-.notif-dot--read {
-  background: transparent;
-}
-
-.notif-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.notif-content {
-  margin: 0;
-  font-size: 13px;
-  color: #1f2937;
-  line-height: 1.5;
-  /* 最多两行，超出省略 */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.notif-item.unread .notif-content {
-  font-weight: 500;
-}
-
-.notif-time {
+.quick-arrow {
+  margin-left: auto;
   font-size: 12px;
   color: #9ca3af;
 }
 
-.notif-footer {
-  display: flex;
-  justify-content: space-between;
-  padding-top: 8px;
-  margin-top: 4px;
-  border-top: 1px solid #f3f4f6;
+.notif-quick-item:hover .quick-arrow {
+  color: #3b82f6;
 }
 
 /* 下拉面板内的用户信息区 */

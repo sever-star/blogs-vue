@@ -2501,10 +2501,10 @@ Authorization: Bearer {accessToken}
 
 ### 前端接入约定
 
-- 顶部导航铃铛（`Header.vue`，登录态显示）：进入页面拉一次 `unread-count` 展示红点，**点开弹层再拉列表**；不做轮询、无 WebSocket（实时性要求不高）
-- 铃铛弹层按分类 tab 前端过滤：全部 / 评论通知 / 点赞收藏 / 关注 / 私信 / 系统
-- 点某条：先 `PUT .../read` 再 `router.push(link)` 跳转到对应文章/评论位置
-- 「查看全部」进入 `/notifications` 列表页（`requiresAuth`）
+- 顶部导航铃铛（`Header.vue`，登录态显示）：进入页面拉一次 `unread-count` 展示红点；不做轮询、无 WebSocket（实时性要求不高）
+- **悬浮铃铛**弹出五个分类快捷入口（评论通知/点赞收藏/关注/私信/系统），点击跳 `/notifications?tab={key}` 预选模块；**点铃铛本体**进入 `/notifications`（全部）
+- `/notifications` 页按 `?tab=` 预选模块，页内切 tab 会同步回 URL（刷新/分享不丢状态）
+- 页内点某条通知：先 `PUT .../read` 再 `router.push(link)` 跳转到对应文章/评论位置
 
 ---
 

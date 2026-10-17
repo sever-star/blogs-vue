@@ -69,16 +69,21 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useNotificationStore, NOTIFICATION_TABS } from '@/stores/notification'
+import type { NotificationTab } from '@/stores/notification'
 import type { Notification, NotificationType } from '@/types'
 
+const route = useRoute()
 const router = useRouter()
 const notifStore = useNotificationStore()
 
 const page = ref(1)
 const pageSize = 20
 const total = ref(0)
+
+/** 支持的 tab 名（不含 all 的 key 集合），用于校验 URL 上的 ?tab= */
+const TAB_KEYS = NOTIFICATION_TABS.map(t => t.key as string)
 
 async function load() {
   await notifStore.fetchList(page.value, pageSize)
@@ -132,12 +137,18 @@ function formatTime(time: string): string {
   })
 }
 
-// 切 tab 时回到第一页
-watch(() => notifStore.activeTab, () => {
+// 切 tab 时回到第一页，并同步到 URL（刷新/分享保持当前模块）
+watch(() => notifStore.activeTab, (tab) => {
   page.value = 1
+  router.replace({ query: tab === 'all' ? {} : { tab } })
 })
 
 onMounted(async () => {
+  // 从铃铛快捷入口进来时带上 ?tab=xxx，预选对应模块
+  const tab = typeof route.query.tab === 'string' ? route.query.tab : ''
+  if (tab && TAB_KEYS.includes(tab)) {
+    notifStore.activeTab = tab as NotificationTab
+  }
   await notifStore.fetchUnreadCount()
   await load()
 })
