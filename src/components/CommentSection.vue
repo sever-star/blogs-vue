@@ -496,7 +496,10 @@ watch(
 onUnmounted(() => observer?.disconnect())
 
 function formatCommentDate(dateString: string): string {
+  // 发布评论的响应若缺 createdAt（后端未回写时），显示「刚刚」而不是 1970/Invalid Date
+  if (!dateString) return '刚刚'
   const date = new Date(dateString)
+  if (isNaN(date.getTime())) return '刚刚'
   return date.toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
