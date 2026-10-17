@@ -49,6 +49,7 @@
             <span v-if="comment.replies && comment.replies.length > 0" class="reply-count">
               回复 ({{ comment.replies.length }})
             </span>
+            <span v-if="canDelete(comment)" class="delete-action" @click="handleDelete(comment)">删除</span>
           </div>
           <!-- 行内回复表单：点该评论的「回复」才出现，提交即子评论 -->
           <div v-if="replyTarget?.key === `t${comment.id}`" class="reply-form">
@@ -96,6 +97,7 @@
                     {{ reply.likeCount }}
                   </span>
                   <span class="reply-action" @click="startReplyToReply(comment, reply)">回复</span>
+                  <span v-if="canDelete(reply)" class="delete-action" @click="handleDelete(reply)">删除</span>
                 </div>
                 <div v-if="replyTarget?.key === `r${reply.id}`" class="reply-form">
                   <textarea
@@ -148,7 +150,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useCommentStore } from '@/stores/comment'
 import { useAuthStore } from '@/stores/auth'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Comment } from '@/types'
 
 const props = withDefaults(
@@ -156,8 +158,10 @@ const props = withDefaults(
     articleId: number
     /** drawer=评论浮窗（全量展示、容器内滚动、无加载更多）；inline=文章下方（首页风格分批+无限滚动） */
     variant?: 'drawer' | 'inline'
+    /** 文章作者 id：与登录用户比对，决定是否展示评论删除按钮 */
+    authorId?: number | null
   }>(),
-  { variant: 'inline' }
+  { variant: 'inline', authorId: null }
 )
 
 const commentStore = useCommentStore()
@@ -256,6 +260,43 @@ async function handleLike(comment: Comment) {
     console.error('评论点赞失败:', error)
   } finally {
     likingId.value = null
+  }
+}
+
+/**
+ * 当前用户能否删除这条评论：管理员 / 文章作者 / 评论作者本人
+ * （与后端 deleteComment 的校验规则一致，按钮只做展示层控制，真正权限在后端）
+ */
+function canDelete(comment: Comment): boolean {
+  const uid = authStore.user?.id
+  if (!authStore.isLoggedIn || !uid) return false
+  if (authStore.isAdmin) return true
+  if (props.authorId != null && props.authorId === uid) return true
+  return comment.userId === uid
+}
+
+/** 删除评论（含子评论）：确认后调接口，成功后本地列表移除 */
+async function handleDelete(comment: Comment) {
+  try {
+    await ElMessageBox.confirm('删除后不可恢复，连同其下回复一并删除，确定吗？', '删除评论', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      confirmButtonClass: 'el-button--danger',
+    })
+  } catch {
+    return // 用户取消
+  }
+  try {
+    await commentStore.deleteComment(props.articleId, comment.id)
+    ElMessage.success('评论已删除')
+  } catch (error: any) {
+    const message =
+      error && typeof error === 'object' && 'message' in error
+        ? String(error.message ?? '')
+        : ''
+    ElMessage.error(message || '删除失败，请重试')
+    console.error('删除评论失败:', error)
   }
 }
 
@@ -620,6 +661,18 @@ function formatCommentDate(dateString: string): string {
   display: flex;
   gap: 8px;
   margin: 4px 0 0;
+}
+
+/* 删除按钮：与「回复」同排，仅文章作者/管理员/评论作者可见 */
+.delete-action {
+  font-size: 13px;
+  color: #999;
+  cursor: pointer;
+  transition: color 0.3s;
+}
+
+.delete-action:hover {
+  color: #f56c6c;
 }
 
 /* 行内回复表单：挂在被回复评论/回复的下方 */

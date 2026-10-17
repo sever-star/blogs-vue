@@ -4,6 +4,7 @@ import type { Comment, CommentPayload } from '@/types'
 import {
   getComments as getCommentsApi,
   submitComment as submitCommentApi,
+  deleteComment as deleteCommentApi,
   likeComment as likeCommentApi,
   unlikeComment as unlikeCommentApi,
 } from '@/api/comment'
@@ -89,19 +90,28 @@ export const useCommentStore = defineStore('comment', () => {
     comment.liked = !wasLiked
   }
 
-  /** 删除评论 */
+  /** 删除评论（权限：评论作者/文章作者/管理员，后端校验）。
+   *  后端会按 parent_id 级联删掉其子评论；成功后清理本地缓存，失败抛错交由组件提示。 */
   const deleteComment = async (articleId: number, commentId: number) => {
     try {
-      // TODO: 接入真实 API: DELETE /posts/{articleId}/comments/{commentId}
-      const articleComments = commentMap.value.get(articleId)
-      if (articleComments) {
-        const index = articleComments.findIndex(c => c.id === commentId)
-        if (index > -1) {
-          articleComments.splice(index, 1)
-        }
-      }
+      await deleteCommentApi(articleId, commentId)
     } catch (error) {
       console.error('删除评论失败:', error)
+      throw error
+    }
+    const articleComments = commentMap.value.get(articleId)
+    if (articleComments) {
+      const idx = articleComments.findIndex(c => c.id === commentId)
+      const removeIds = new Set<number>([commentId])
+      // 删的是顶级评论时，其 replies 也被后端级联删除，本地同步移除
+      if (idx > -1 && !articleComments[idx].parentId) {
+        articleComments
+          .filter(c => c.parentId === commentId)
+          .forEach(c => removeIds.add(c.id))
+      }
+      for (let i = articleComments.length - 1; i >= 0; i--) {
+        if (removeIds.has(articleComments[i].id)) articleComments.splice(i, 1)
+      }
     }
   }
 

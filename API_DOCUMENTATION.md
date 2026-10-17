@@ -979,13 +979,19 @@ Authorization: Bearer {accessToken}
 **错误情况**
 
 - 401: 未登录
-- 403: 只有评论作者或管理员可以删除
+- 403: 只有评论作者本人、当前文章作者或管理员可以删除（后端 `deleteComment` 三者取或）
 - 404: 评论不存在
 
 **备注**
 
 - 删除后文章 `commentCount` -1
+- 删除顶级评论时按 `parent_id` **级联删除其下所有回复**
 - **评论发布后不支持编辑**：用户对已发布评论只有「删除」这一个操作入口
+
+**前端接入约定**
+
+- `CommentSection.vue` 评论/回复操作栏有「删除」入口，**展示条件**：管理员 `isAdmin`、或当前用户是文章作者（`ArticleDetail` 传入 `:author-id`）、或当前用户是该评论作者；真正权限以后端校验为准
+- 点删除先弹 `ElMessageBox` 二次确认，确认后 `DELETE /posts/{articleId}/comments/{commentId}`，成功后本地缓存移除该评论（顶级评论连带 replies，与后端级联一致）
 
 ---
 

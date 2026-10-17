@@ -64,7 +64,7 @@
           </div>
 
           <!-- 文章下方评论区：首页文章列表同款（默认 5 条 + 查看全部评论后无限加载） -->
-          <CommentSection :article-id="articleId" variant="inline" class="below-comments" />
+          <CommentSection :article-id="articleId" :author-id="articleStore.currentArticle?.userId ?? null" variant="inline" class="below-comments" />
         </article>
       </div>
 
@@ -143,7 +143,7 @@
           </el-button>
         </div>
         <div class="comment-drawer-body">
-          <CommentSection :article-id="articleId" variant="drawer" />
+          <CommentSection :article-id="articleId" :author-id="articleStore.currentArticle?.userId ?? null" variant="drawer" />
         </div>
       </aside>
     </transition>
