@@ -387,9 +387,9 @@ async function handleConfirm() {
         // （草稿保持草稿 0，已发布的编辑期间下架 2，同时 review_status 归 0 重审）
         status: 0,
       })
+      // 保存修改后留在编辑页（文章已进入重审，跳详情页看到的是下架状态，没有意义）
       ElMessage.success('修改已保存，等待重新审核')
       metaDialogVisible.value = false
-      router.push(`/article/${editId.value}`)
       return
     }
 
