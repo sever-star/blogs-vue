@@ -2512,6 +2512,7 @@ Authorization: Bearer {accessToken}
 - **悬浮铃铛**弹出五个分类快捷入口（评论通知/点赞收藏/关注/私信/系统），点击跳 `/notifications?tab={key}` 预选模块；**点铃铛本体**默认进第一个分类：`/notifications?tab=comment`
 - `/notifications` 页按 `?tab=` 预选模块；`?tab=` 缺失或非法时统一落到 `comment` 并回写 URL；页内切 tab 会同步回 URL（刷新/分享不丢状态）
 - 页内点某条通知：先 `PUT .../read` 再 `router.push(link)` 跳转到对应文章/评论位置
+- **锚点定位链路**（评论点赞通知已接入）：后端 link 形如 `/article/{postId}#comment-{commentId}`；`CommentSection.vue`（inline 变体）在评论加载完成后解析 `route.hash`，必要时展开「查看全部」并扩大展示批次，`nextTick` 后按 `id="comment-{commentId}"` 找 DOM（带重试）`scrollIntoView`，目标评论黄色高亮 2.5s；已在文章页时监听 `route.hash` 再次触发。已触发 `comment_like`：`BlogPostCommentService.likeComment` 在 `saveLike` 成功后调 `createNotification`（try/catch 包裹，通知失败不影响点赞）
 
 ---
 

@@ -22,7 +22,13 @@
 
     <!-- 评论列表 -->
     <div class="comments-list">
-      <div v-for="comment in visibleComments" :key="comment.id" class="comment-item">
+      <div
+        v-for="comment in visibleComments"
+        :key="comment.id"
+        :id="`comment-${comment.id}`"
+        class="comment-item"
+        :class="{ 'comment-highlight': highlightId === comment.id }"
+      >
         <img :src="comment.avatar" :alt="comment.nickname" class="user-avatar" />
         <div class="comment-content">
           <div class="comment-header">
@@ -68,7 +74,13 @@
           </div>
           <!-- 嵌套回复 -->
           <div v-if="comment.replies && comment.replies.length > 0" class="replies-list">
-            <div v-for="reply in comment.replies" :key="reply.id" class="reply-item">
+            <div
+              v-for="reply in comment.replies"
+              :key="reply.id"
+              :id="`comment-${reply.id}`"
+              class="reply-item"
+              :class="{ 'comment-highlight': highlightId === reply.id }"
+            >
               <img :src="reply.avatar" :alt="reply.nickname" class="reply-avatar" />
               <div class="reply-content">
                 <div class="reply-header">
@@ -148,6 +160,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useCommentStore } from '@/stores/comment'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -166,6 +179,7 @@ const props = withDefaults(
 
 const commentStore = useCommentStore()
 const authStore = useAuthStore()
+const route = useRoute()
 
 const newComment = ref('')
 const submitting = ref(false)
@@ -192,7 +206,58 @@ const showEntryButton = computed(
 
 onMounted(async () => {
   await commentStore.fetchComments(props.articleId)
+  await scrollToCommentIfAny()
 })
+
+// 已在文章页时又点了一条指向同文不同评论的通知：URL 只变 hash、组件不重挂载，
+// 必须监听 route.hash 再触发一次定位
+watch(() => route.hash, async () => {
+  await scrollToCommentIfAny()
+})
+
+// ---- 站内通知跳转定位：/article/{id}#comment-{commentId} ----
+/** 当前高亮的评论 id（黄色背景闪烁，帮用户找到目标） */
+const highlightId = ref<number | null>(null)
+
+/** 从路由 hash 里解析目标评论 id（#comment-123 → 123） */
+function anchorCommentIdFromHash(): number | null {
+  const m = route.hash.match(/^#comment-(\d+)$/)
+  return m ? Number(m[1]) : null
+}
+
+/**
+ * 通知跳转过来后滚动到目标评论。
+ * 时序：路由到达时评论还在异步加载/未展开，必须等 fetchComments 完成、
+ * 目标所在顶级评论进入展示批次、DOM 渲染出来之后再滚。
+ * 仅 inline（文章下方评论区）执行；drawer 变体懒加载，不做自动滚动。
+ */
+async function scrollToCommentIfAny() {
+  if (props.variant !== 'inline') return
+  const targetId = anchorCommentIdFromHash()
+  if (!targetId) return
+  const all = comments.value
+  const topIdx = all.findIndex(
+    (c: Comment) => c.id === targetId || c.replies?.some((r: Comment) => r.id === targetId)
+  )
+  if (topIdx === -1) return // 评论不存在（已删除或不属于本文）
+  // 目标在未展示的批次里：展开列表并把展示条数扩到包含它
+  if (!expanded.value && topIdx >= PREVIEW_COUNT) expandToList()
+  if (topIdx >= displayCount.value) displayCount.value = topIdx + 1
+  // 等 DOM 渲染；保险起见重试几轮
+  for (let i = 0; i < 10; i++) {
+    await nextTick()
+    const el = document.getElementById(`comment-${targetId}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      highlightId.value = targetId
+      setTimeout(() => {
+        if (highlightId.value === targetId) highlightId.value = null
+      }, 2500)
+      return
+    }
+    await new Promise(r => setTimeout(r, 200))
+  }
+}
 
 // 切换文章时重置分批加载状态
 watch(
@@ -565,6 +630,22 @@ function formatCommentDate(dateString: string): string {
 
 .comment-item:last-child {
   border-bottom: none;
+}
+
+/* 从通知跳转定位到的目标评论：短暂高亮帮用户找到位置 */
+.comment-item.comment-highlight,
+.reply-item.comment-highlight {
+  animation: comment-flash 2.5s ease;
+  border-radius: 6px;
+}
+
+@keyframes comment-flash {
+  0% {
+    background-color: #fff7e6;
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 .user-avatar {
