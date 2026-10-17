@@ -82,7 +82,7 @@ const page = ref(1)
 const pageSize = 20
 const total = ref(0)
 
-/** 支持的 tab 名（不含 all 的 key 集合），用于校验 URL 上的 ?tab= */
+/** 支持的 tab 名（五个分类的 key 集合），用于校验 URL 上的 ?tab= */
 const TAB_KEYS = NOTIFICATION_TABS.map(t => t.key as string)
 
 async function load() {
@@ -138,16 +138,20 @@ function formatTime(time: string): string {
 }
 
 // 切 tab 时回到第一页，并同步到 URL（刷新/分享保持当前模块）
-watch(() => notifStore.activeTab, (tab) => {
+watch(() => notifStore.activeTab, (tab: NotificationTab) => {
   page.value = 1
-  router.replace({ query: tab === 'all' ? {} : { tab } })
+  router.replace({ query: { tab } })
 })
 
 onMounted(async () => {
-  // 从铃铛快捷入口进来时带上 ?tab=xxx，预选对应模块
+  // 从铃铛快捷入口进来时带上 ?tab=xxx，预选对应模块；
+  // 缺失/非法 tab 统一落到第一个分类「评论通知」
   const tab = typeof route.query.tab === 'string' ? route.query.tab : ''
-  if (tab && TAB_KEYS.includes(tab)) {
-    notifStore.activeTab = tab as NotificationTab
+  notifStore.activeTab = TAB_KEYS.includes(tab)
+    ? (tab as NotificationTab)
+    : NOTIFICATION_TABS[0].key
+  if (route.query.tab !== notifStore.activeTab) {
+    router.replace({ query: { tab: notifStore.activeTab } })
   }
   await notifStore.fetchUnreadCount()
   await load()

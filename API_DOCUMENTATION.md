@@ -2502,8 +2502,9 @@ Authorization: Bearer {accessToken}
 ### 前端接入约定
 
 - 顶部导航铃铛（`Header.vue`，登录态显示）：进入页面拉一次 `unread-count` 展示红点；不做轮询、无 WebSocket（实时性要求不高）
-- **悬浮铃铛**弹出五个分类快捷入口（评论通知/点赞收藏/关注/私信/系统），点击跳 `/notifications?tab={key}` 预选模块；**点铃铛本体**进入 `/notifications`（全部）
-- `/notifications` 页按 `?tab=` 预选模块，页内切 tab 会同步回 URL（刷新/分享不丢状态）
+- **通知页无「全部」分类**：只有五个模块 tab（评论通知/点赞收藏/关注/私信/系统），默认激活第一个 `comment`
+- **悬浮铃铛**弹出五个分类快捷入口（评论通知/点赞收藏/关注/私信/系统），点击跳 `/notifications?tab={key}` 预选模块；**点铃铛本体**默认进第一个分类：`/notifications?tab=comment`
+- `/notifications` 页按 `?tab=` 预选模块；`?tab=` 缺失或非法时统一落到 `comment` 并回写 URL；页内切 tab 会同步回 URL（刷新/分享不丢状态）
 - 页内点某条通知：先 `PUT .../read` 再 `router.push(link)` 跳转到对应文章/评论位置
 
 ---

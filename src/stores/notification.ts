@@ -8,9 +8,8 @@ import {
   markAllNotificationsRead,
 } from '@/api/notification'
 
-/** 铃铛面板的分类分组 → 对应的 type 集合 */
+/** 通知页的分类模块（无「全部」：铃铛本体默认进第一个分类 comment） */
 export const NOTIFICATION_TABS = [
-  { key: 'all', label: '全部' },
   { key: 'comment', label: '评论通知' },
   { key: 'like', label: '点赞收藏' },
   { key: 'follow', label: '关注' },
@@ -21,7 +20,7 @@ export const NOTIFICATION_TABS = [
 export type NotificationTab = (typeof NOTIFICATION_TABS)[number]['key']
 
 /** 某条通知归到哪个 tab */
-function tabOf(n: Notification): Exclude<NotificationTab, 'all'> {
+function tabOf(n: Notification): NotificationTab {
   switch (n.type) {
     case 'post_comment':
     case 'comment_reply':
@@ -43,7 +42,7 @@ export const useNotificationStore = defineStore('notification', () => {
   const list = ref<Notification[]>([])
   const unreadCount = ref(0)
   const loading = ref(false)
-  const activeTab = ref<NotificationTab>('all')
+  const activeTab = ref<NotificationTab>('comment')
   const total = ref(0)
 
   /** 进入页面 / 点开铃铛时拉一次未读数（不轮询） */
@@ -73,7 +72,6 @@ export const useNotificationStore = defineStore('notification', () => {
 
   /** 当前 tab 下展示的通知（前端分组，避免为每个分类多打一个接口） */
   const visibleList = () => {
-    if (activeTab.value === 'all') return list.value
     return list.value.filter(n => tabOf(n) === activeTab.value)
   }
 
@@ -106,7 +104,7 @@ export const useNotificationStore = defineStore('notification', () => {
   const clear = () => {
     list.value = []
     unreadCount.value = 0
-    activeTab.value = 'all'
+    activeTab.value = 'comment'
   }
 
   return {

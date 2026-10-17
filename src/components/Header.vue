@@ -38,7 +38,7 @@
         <!-- Auth section -->
         <div class="auth-section">
           <!-- 站内通知铃铛（仅登录）：悬浮弹出五个分类快捷入口，点击跳通知页对应模块；
-               点铃铛本体进入全部通知。未读数进入页面拉一次，不轮询 -->
+               点铃铛本体默认进第一个分类「评论通知」。未读数进入页面拉一次，不轮询 -->
           <el-popover
             v-if="isLoggedIn"
             placement="bottom-end"
@@ -174,8 +174,8 @@ const { isLoggedIn, isAdmin, user, showLoginModal } = storeToRefs(authStore)
 
 // ---- 站内通知铃铛 ----
 
-/** 悬浮弹层的五个分类快捷入口（不含「全部」，点铃铛本体即全部） */
-const NOTIF_QUICK_ENTRIES: Array<{ tab: Exclude<NotificationTab, 'all'>; label: string; icon: unknown }> = [
+/** 悬浮弹层的五个分类快捷入口 */
+const NOTIF_QUICK_ENTRIES: Array<{ tab: NotificationTab; label: string; icon: unknown }> = [
   { tab: 'comment', label: '评论通知', icon: ChatDotRound },
   { tab: 'like', label: '点赞收藏', icon: Star },
   { tab: 'follow', label: '关注', icon: User },
@@ -183,9 +183,9 @@ const NOTIF_QUICK_ENTRIES: Array<{ tab: Exclude<NotificationTab, 'all'>; label: 
   { tab: 'system', label: '系统', icon: InfoFilled },
 ]
 
-/** 跳转通知页并预选模块（tab 为空即全部） */
-function goNotifications(tab?: NotificationTab) {
-  router.push({ name: 'Notifications', query: tab ? { tab } : {} })
+/** 跳转通知页（点铃铛本体默认进第一个分类「评论通知」，点快捷入口进对应模块） */
+function goNotifications(tab: NotificationTab = 'comment') {
+  router.push({ name: 'Notifications', query: { tab } })
 }
 
 // 进入页面拉一次未读数（登录态恢复后）；登出时清空
