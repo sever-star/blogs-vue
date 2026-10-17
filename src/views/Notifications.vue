@@ -137,19 +137,31 @@ function formatTime(time: string): string {
   })
 }
 
+/** 把 URL 上的 ?tab= 归一化为合法分类（缺失/非法落到第一个「评论通知」） */
+function normalizeTab(tab: unknown): NotificationTab {
+  return typeof tab === 'string' && TAB_KEYS.includes(tab)
+    ? (tab as NotificationTab)
+    : NOTIFICATION_TABS[0].key
+}
+
 // 切 tab 时回到第一页，并同步到 URL（刷新/分享保持当前模块）
 watch(() => notifStore.activeTab, (tab: NotificationTab) => {
   page.value = 1
   router.replace({ query: { tab } })
 })
 
+// 已在本页时从铃铛再点快捷入口：只有 query 变、组件不重挂载，
+// 必须监听 route.query.tab 把激活模块切过去，否则 URL 变了页面不动
+watch(() => route.query.tab, (tab: unknown) => {
+  const key = normalizeTab(tab)
+  if (key !== notifStore.activeTab) {
+    notifStore.activeTab = key
+  }
+})
+
 onMounted(async () => {
-  // 从铃铛快捷入口进来时带上 ?tab=xxx，预选对应模块；
-  // 缺失/非法 tab 统一落到第一个分类「评论通知」
-  const tab = typeof route.query.tab === 'string' ? route.query.tab : ''
-  notifStore.activeTab = TAB_KEYS.includes(tab)
-    ? (tab as NotificationTab)
-    : NOTIFICATION_TABS[0].key
+  // 从铃铛快捷入口进来时带上 ?tab=xxx，预选对应模块
+  notifStore.activeTab = normalizeTab(route.query.tab)
   if (route.query.tab !== notifStore.activeTab) {
     router.replace({ query: { tab: notifStore.activeTab } })
   }
