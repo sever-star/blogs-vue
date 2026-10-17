@@ -985,7 +985,7 @@ Authorization: Bearer {accessToken}
 **备注**
 
 - 删除后文章 `commentCount` -1
-- 删除顶级评论时按 `parent_id` **级联删除其下所有回复**
+- **级联删除**：删除 `parent_id = commentId`（顶级评论的所有回复）**或** `reply_to_id = commentId`（回复该回复的二级回复）的行；前端本地缓存按同一规则同步移除
 - **评论发布后不支持编辑**：用户对已发布评论只有「删除」这一个操作入口
 
 **前端接入约定**

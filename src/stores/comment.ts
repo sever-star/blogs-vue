@@ -91,7 +91,7 @@ export const useCommentStore = defineStore('comment', () => {
   }
 
   /** 删除评论（权限：评论作者/文章作者/管理员，后端校验）。
-   *  后端会按 parent_id 级联删掉其子评论；成功后清理本地缓存，失败抛错交由组件提示。 */
+   *  后端级联删除 parent_id 或 reply_to_id 指向它的行；成功后本地同步移除，失败抛错交由组件提示。 */
   const deleteComment = async (articleId: number, commentId: number) => {
     try {
       await deleteCommentApi(articleId, commentId)
@@ -101,14 +101,12 @@ export const useCommentStore = defineStore('comment', () => {
     }
     const articleComments = commentMap.value.get(articleId)
     if (articleComments) {
-      const idx = articleComments.findIndex(c => c.id === commentId)
+      // 与后端级联规则对齐：后端删 parent_id=X（顶级的 replies）或
+      // reply_to_id=X（回复该回复的二级回复）的所有行，本地同步全部移除
       const removeIds = new Set<number>([commentId])
-      // 删的是顶级评论时，其 replies 也被后端级联删除，本地同步移除
-      if (idx > -1 && !articleComments[idx].parentId) {
-        articleComments
-          .filter(c => c.parentId === commentId)
-          .forEach(c => removeIds.add(c.id))
-      }
+      articleComments.forEach(c => {
+        if (c.parentId === commentId || c.replyToId === commentId) removeIds.add(c.id)
+      })
       for (let i = articleComments.length - 1; i >= 0; i--) {
         if (removeIds.has(articleComments[i].id)) articleComments.splice(i, 1)
       }
