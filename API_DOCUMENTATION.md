@@ -1811,6 +1811,56 @@ Content-Type: application/json
 
 ---
 
+### 3. 修改当前用户密码
+
+> **状态**：前端已接入（`Profile.vue` 修改密码卡片 + `api/auth.ts#changePassword`），后端待实现。
+
+**请求**
+
+```
+PUT /auth/me/password
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+**入参**（均必填）
+
+```json
+{
+  "oldPassword": "string (原密码)",
+  "newPassword": "string (新密码，6-32 位，与注册口径一致)"
+}
+```
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": null
+}
+```
+
+**错误情况**
+
+- 401: accessToken 无效或已过期
+- 400: 原密码错误 / 新密码与原密码相同 / 新密码格式不合法（@NotBlank + @Size(6,32)）
+
+**后端约定**
+
+- 身份取自 SecurityContext（`SecurityUtils.currentUserId()`），不接受 userId 入参
+- 新密码 BCrypt 加密后 UPDATE `blog_users.password`
+- 成功后调 `revokeAllByUserId(userId)` 把该用户**全部** refreshToken 置 `revoked=1`（含当前设备）——改密即全员重新登录，不重发 token
+
+**前端接入约定**
+
+- 入口：`/profile` 页「修改密码」卡片（原密码/新密码/确认新密码）；头像菜单「账号设置」跳转此页
+- 提交前本地校验：新密码 6-32 位、两次输入一致、新≠旧（后端为准）
+- 成功后：提示「密码修改成功，请重新登录」→ `authStore.logout()` 本地清理 → 跳首页并弹出登录框
+
+---
+
 ## 用户管理接口
 
 > **仅管理员（role=ADMIN）可用**：非管理员访问一律返回 403（业务码 403001），

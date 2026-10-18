@@ -79,3 +79,15 @@ export const refreshToken = async (): Promise<AuthResponse> => {
 export const logout = async (): Promise<void> => {
   await client.post('/auth/logout', null, { withCredentials: true })
 }
+
+/**
+ * 修改当前用户密码
+ * PUT /auth/me/password
+ *
+ * 身份取自 accessToken（SecurityContext），不接受 userId 参数。
+ * 后端校验旧密码后落库，并撤销该用户全部 refreshToken（含当前设备），
+ * 因此前端成功后需本地登出并引导重新登录。
+ */
+export const changePassword = async (oldPassword: string, newPassword: string): Promise<void> => {
+  await client.put('/auth/me/password', { oldPassword, newPassword }, { withCredentials: true })
+}

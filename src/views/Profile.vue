@@ -131,6 +131,57 @@
             </el-form-item>
           </el-form>
         </el-card>
+
+        <!-- 修改密码卡片：与资料卡独立，改密成功后需重新登录（后端会撤销全部会话） -->
+        <el-card shadow="never" class="profile-card password-card">
+          <template #header>
+            <div class="card-header">
+              <span class="card-title">修改密码</span>
+            </div>
+          </template>
+
+          <el-form
+            ref="pwdFormRef"
+            :model="pwdForm"
+            :rules="pwdRules"
+            label-width="90px"
+            class="profile-form"
+          >
+            <el-form-item label="原密码" prop="oldPassword">
+              <el-input
+                v-model="pwdForm.oldPassword"
+                type="password"
+                placeholder="请输入当前密码"
+                show-password
+                autocomplete="current-password"
+              />
+            </el-form-item>
+            <el-form-item label="新密码" prop="newPassword">
+              <el-input
+                v-model="pwdForm.newPassword"
+                type="password"
+                placeholder="6-32 位字符"
+                show-password
+                autocomplete="new-password"
+              />
+            </el-form-item>
+            <el-form-item label="确认新密码" prop="confirmPassword">
+              <el-input
+                v-model="pwdForm.confirmPassword"
+                type="password"
+                placeholder="请再次输入新密码"
+                show-password
+                autocomplete="new-password"
+              />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :loading="pwdSaving" @click="handleChangePassword">
+                确认修改
+              </el-button>
+            </el-form-item>
+          </el-form>
+          <p class="password-hint">修改成功后，所有设备（包括当前）都需要重新登录。</p>
+        </el-card>
       </main>
     </div>
   </div>
@@ -146,6 +197,7 @@ import { Edit, Refresh, Upload } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { randomAvatar } from '@/utils/avatar'
 import { uploadAvatar } from '@/api/upload'
+import { changePassword } from '@/api/auth'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -264,6 +316,78 @@ async function handleSave() {
 function formatDate(date?: string | null): string {
   if (!date) return '—'
   return new Date(date).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' })
+}
+
+// ---- 修改密码 ----
+const pwdFormRef = ref<FormInstance>()
+const pwdSaving = ref(false)
+const pwdForm = reactive({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+})
+
+const pwdRules = {
+  oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, max: 32, message: '密码长度为 6 到 32 个字符', trigger: 'blur' },
+    {
+      validator: (_rule: unknown, value: string, callback: (err?: Error) => void) => {
+        if (value && value === pwdForm.oldPassword) {
+          callback(new Error('新密码不能与原密码相同'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入新密码', trigger: 'blur' },
+    {
+      validator: (_rule: unknown, value: string, callback: (err?: Error) => void) => {
+        if (value && value !== pwdForm.newPassword) {
+          callback(new Error('两次输入的密码不一致'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
+}
+
+/**
+ * 修改密码：成功后端会撤销该用户全部会话（含当前设备），
+ * 因此本地登出清理 + 引导重新登录，避免带着已失效的凭证继续操作。
+ */
+async function handleChangePassword() {
+  if (!pwdFormRef.value) return
+  await pwdFormRef.value.validate(async (valid: boolean) => {
+    if (!valid) return
+    pwdSaving.value = true
+    try {
+      await changePassword(pwdForm.oldPassword, pwdForm.newPassword)
+      ElMessage.success('密码修改成功，请重新登录')
+      // 先本地登出（logout 内部会尽力通知后端清 cookie，失败也不影响本地清理）
+      await authStore.logout()
+      pwdForm.oldPassword = ''
+      pwdForm.newPassword = ''
+      pwdForm.confirmPassword = ''
+      pwdFormRef.value?.clearValidate()
+      router.push('/')
+      authStore.openLoginModal('login')
+    } catch (error: any) {
+      // 透出后端原因（原密码错误/格式不合法等）
+      const message =
+        error && typeof error === 'object' && 'message' in error ? String(error.message ?? '') : ''
+      ElMessage.error(message || '修改失败，请重试')
+      console.error('修改密码失败:', error)
+    } finally {
+      pwdSaving.value = false
+    }
+  })
 }
 
 // 未登录时不允许进入（路由守卫兜底）
@@ -389,6 +513,17 @@ if (!authStore.isLoggedIn) {
 
 .profile-form {
   padding-top: 8px;
+}
+
+/* 修改密码卡片与资料卡片的间距 */
+.password-card {
+  margin-top: 24px;
+}
+
+.password-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #9ca3af;
 }
 
 @media (max-width: 768px) {

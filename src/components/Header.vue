@@ -212,7 +212,8 @@ const handleCommand = (command: string) => {
       window.open(router.resolve({ name: 'MyArticles' }).href, '_blank')
       break
     case 'settings':
-      ElMessage.info('账号设置页面开发中')
+      // 账号设置即个人资料页（含修改密码卡片）
+      router.push('/profile')
       break
     case 'logout':
       authStore.logout()
