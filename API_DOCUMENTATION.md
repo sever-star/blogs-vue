@@ -2459,8 +2459,8 @@ Authorization: Bearer {accessToken}
 - 仅返回**当前登录用户**自己的通知，按 `createdAt` 倒序
 - `content` 已在生成时拼好触发者昵称（如「张三 回复了你的评论」），前端直接展示
 - 评论类通知 `link` 带锚点 `/article/{id}#comment-{commentId}`，跳转后定位到具体评论
-- `type` 枚举：`post_comment`（评论文章）/ `comment_reply`（回复评论）/ `comment_like`（评论被赞）/ `like`（文章被赞）/ `favorite`（文章被收藏）/ `follow`（被关注）/ `message`（收到私信）/ `system`（系统）
-- 触发时机：评论成功、评论点赞成功、文章点赞成功（关注/私信/收藏模块上线后各自触发）；自己触发自己的动作不生成（防自扰）
+- `type` 枚举：`post_comment`（评论文章）/ `comment_reply`（回复评论）/ `comment_like`（评论被赞）/ `like`（文章被赞）/ `favorite`（文章被收藏）/ `follow`（被关注）/ `message`（收到私信）/ `system`（系统）。**前端 `tabOf` 按这些值分组**：post_comment/comment_reply/comment_like → 评论通知 tab；like/favorite → 点赞收藏 tab；其余 → 系统 tab。后端生成时必须用此枚举，自造值（如 post_like/comment_create）会全部落到系统分类
+- 触发时机（均已接入）：顶级评论成功 → 文章作者收 `post_comment`；回复评论成功 → 被回复评论的作者收 `comment_reply`；评论点赞成功 → 评论作者收 `comment_like`；文章点赞/收藏成功 → 文章作者收 `like` / `favorite`。各触发点 try/catch 包裹（通知失败不影响主流程）；自己触发自己的动作不生成（防自扰）；取消点赞/收藏不撤回已发通知
 
 ---
 
@@ -2874,7 +2874,7 @@ CREATE TABLE blog_links (
 CREATE TABLE blog_notifications (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   user_id INT NOT NULL COMMENT '接收用户ID',
-  type VARCHAR(30) NOT NULL COMMENT 'comment_reply/post_like/comment_like/system',
+  type VARCHAR(30) NOT NULL COMMENT 'post_comment/comment_reply/comment_like/like/favorite/follow/message/system',
   title VARCHAR(100) NOT NULL,
   content VARCHAR(500) NOT NULL,
   link VARCHAR(255) DEFAULT NULL,
