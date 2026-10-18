@@ -12,6 +12,7 @@ import {
   createArticle as createArticleApi,
   updateArticle as updateArticleApi,
   deleteArticle as deleteArticleApi,
+  offlineArticle as offlineArticleApi,
   likeArticle as likeArticleApi,
   unlikeArticle as unlikeArticleApi,
   favoriteArticle as favoriteArticleApi,
@@ -284,6 +285,21 @@ export const useArticleStore = defineStore('article', () => {
     }
   }
 
+  /** 下架文章（作者/管理员）：成功后本地 status 置 2，失败抛错交由组件提示 */
+  const offlineArticle = async (id: number) => {
+    try {
+      await offlineArticleApi(id)
+    } catch (error) {
+      console.error('下架文章失败:', error)
+      throw error
+    }
+    const apply = (a: Article | ArticleListItem) => {
+      if (a.id === id) a.status = 2
+    }
+    allArticles.value.forEach(apply)
+    if (currentArticle.value) apply(currentArticle.value)
+  }
+
   /** 删除文章 */
   const deleteArticle = async (id: number) => {
     try {
@@ -415,6 +431,7 @@ export const useArticleStore = defineStore('article', () => {
     fetchArticleById,
     createArticle,
     updateArticle,
+    offlineArticle,
     deleteArticle,
     likeArticle,
     unlikeArticle,

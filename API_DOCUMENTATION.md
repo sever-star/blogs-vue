@@ -690,6 +690,47 @@ Authorization: Bearer {accessToken}
 
 ---
 
+#### 6.4 下架文章（作者本人或管理员）
+
+**请求**
+
+```
+PUT /posts/{id}/offline
+Authorization: Bearer {accessToken}
+```
+
+**URL 参数**
+| 参数 | 类型 | 说明 |
+|-----|------|------|
+| id | number | 文章 ID |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": null
+}
+```
+
+**权限与状态规则**
+
+- 仅**文章作者本人**或**管理员**可下架（403 否则）
+- 仅 `status=1`（已发布）可下架（400 否则：草稿无需下架、已下架重复下架报错）
+- 只改 `status 1→2`，`review_status` 保持 1（区别于编辑重审：编辑会把 `review_status` 归 0）
+- **不设直接重新上架接口**：下架后由作者编辑（`review_status` 归 0 进待审）→ 管理员审核通过（`approve` 置 `status=1 + review_status=1`）回到已发布
+
+**联动**
+
+- 管理员下架他人文章时给作者生成一条 `system` 通知（「下架了你的文章《标题》」，link 指向文章）；作者自己下架不发（防自扰）
+
+**前端接入约定**
+
+- 「我的文章」已发布行内有「下架」按钮；文章详情页作者/管理员在已发布文章标题旁有「下架」按钮（`canOffline`）；均先 `ElMessageBox` 二次确认，成功后本地 `status` 置 2（tab 分组/计数自动更新，详情页按钮随 `canOffline` 消失）
+
+---
+
 ### 7. 点赞文章
 
 **请求**

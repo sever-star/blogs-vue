@@ -104,6 +104,14 @@ export const rejectArticle = async (id: number): Promise<Article> => {
 }
 
 /**
+ * 下架文章（作者本人或管理员；仅 status=1 已发布可下架）
+ * PUT /posts/{id}/offline
+ */
+export const offlineArticle = async (id: number): Promise<void> => {
+  await client.put(`/posts/${id}/offline`)
+}
+
+/**
  * 点赞文章
  * POST /posts/{id}/like
  */

@@ -23,6 +23,17 @@
                 <el-icon><Edit /></el-icon>
                 编辑文章
               </el-button>
+              <!-- 下架：作者本人或管理员，仅已发布（status=1）；重新上架走编辑→审核流程 -->
+              <el-button
+                v-if="canOffline"
+                type="danger"
+                plain
+                size="small"
+                class="offline-btn"
+                @click="handleOffline"
+              >
+                下架
+              </el-button>
             </div>
 
             <div class="article-info">
@@ -155,7 +166,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useArticleStore } from '@/stores/article'
 import { useAuthStore } from '@/stores/auth'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MdPreview as MDPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
 import { Star, StarFilled, ChatDotRound, User, Calendar, View, Edit, Close } from '@element-plus/icons-vue'
@@ -173,6 +184,13 @@ const isAuthor = computed(
   () =>
     !!authStore.user?.id &&
     articleStore.currentArticle?.userId === authStore.user.id
+)
+
+// 可下架：作者本人或管理员，且文章处于已发布状态
+const canOffline = computed(
+  () =>
+    (isAuthor.value || authStore.isAdmin) &&
+    articleStore.currentArticle?.status === 1
 )
 
 // 记录进入详情页前的标题：新标签页打开时是 index.html 的「个人博客」，
@@ -253,6 +271,33 @@ function errorText(error: unknown, fallback: string): string {
 
 function handleEdit() {
   router.push(`/write/${articleId.value}`)
+}
+
+/** 下架文章（作者/管理员）：确认后调接口，store 同步 currentArticle.status，按钮随 canOffline 自动消失 */
+async function handleOffline() {
+  try {
+    await ElMessageBox.confirm(
+      '下架后文章将从首页和列表消失，需重新编辑并经管理员审核才能再次发布，确定下架吗？',
+      '下架文章',
+      {
+        type: 'warning',
+        confirmButtonText: '下架',
+        cancelButtonText: '取消',
+        confirmButtonClass: 'el-button--danger',
+      }
+    )
+  } catch {
+    return // 用户取消
+  }
+  try {
+    await articleStore.offlineArticle(articleId.value)
+    ElMessage.success('文章已下架')
+  } catch (error: any) {
+    const message =
+      error && typeof error === 'object' && 'message' in error ? String(error.message ?? '') : ''
+    ElMessage.error(message || '下架失败，请重试')
+    console.error('下架文章失败:', error)
+  }
 }
 
 function formatDate(dateString: string): string {

@@ -107,6 +107,16 @@
               <el-icon style="margin-right: 4px"><Edit /></el-icon>
               编辑
             </el-button>
+            <!-- 仅已发布可下架；下架后需重新编辑并经管理员审核才能再发布 -->
+            <el-button
+              v-if="article.status === 1"
+              size="small"
+              type="danger"
+              plain
+              @click="handleOffline(article)"
+            >
+              下架
+            </el-button>
           </div>
         </div>
       </div>
@@ -117,9 +127,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Edit, Calendar, View, Star, Folder } from '@element-plus/icons-vue'
-import { getMyArticles } from '@/api/article'
+import { getMyArticles, offlineArticle } from '@/api/article'
 import type { ArticleListItem } from '@/types'
 
 const router = useRouter()
@@ -186,6 +196,34 @@ const emptyText = computed(() => {
       return '还没有写过文章，点击右上角开始创作'
   }
 })
+
+/** 下架：确认后调接口，成功后本地 status 置 2（行会随筛选/计数自动移到「已下架」） */
+async function handleOffline(article: ArticleListItem) {
+  try {
+    await ElMessageBox.confirm(
+      '下架后文章将从首页和列表消失，需重新编辑并经管理员审核才能再次发布，确定下架吗？',
+      '下架文章',
+      {
+        type: 'warning',
+        confirmButtonText: '下架',
+        cancelButtonText: '取消',
+        confirmButtonClass: 'el-button--danger',
+      }
+    )
+  } catch {
+    return // 用户取消
+  }
+  try {
+    await offlineArticle(article.id)
+    article.status = 2
+    ElMessage.success('文章已下架')
+  } catch (error: any) {
+    const message =
+      error && typeof error === 'object' && 'message' in error ? String(error.message ?? '') : ''
+    ElMessage.error(message || '下架失败，请重试')
+    console.error('下架文章失败:', error)
+  }
+}
 
 async function load() {
   loading.value = true
