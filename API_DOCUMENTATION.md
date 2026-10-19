@@ -2067,6 +2067,66 @@ Content-Type: application/json
 
 ---
 
+## 系统公告接口（管理端）
+
+> **状态**：设计定稿，前后端均待实现。
+> **模型**：公告源存 `blog_announcements` 表；发布即**写时扩散**到每个正常用户的 `blog_notifications`（`type='announcement'`、`source_id` 指向源）。用户侧零新增接口——从铃铛系统 tab 直接消费。SecurityConfig 需为 `/api/announcements` 的 POST/PUT/DELETE（及管理端列表 GET）加 `hasAuthority("ADMIN")`，且必须声明在 `/api/**` 宽松规则之前。
+
+### 1. 发布公告
+
+**请求**
+
+```
+POST /api/announcements
+Authorization: Bearer {accessToken}（ADMIN）
+Content-Type: application/json
+
+{ "title": "系统维护通知", "content": "本周六 02:00-04:00 系统维护，期间无法发文。" }
+```
+
+| 参数 | 类型 | 说明 |
+|-----|------|------|
+| title | string | 必填，1-100 字符 |
+| content | string | 必填，1-2000 字符 |
+
+**返回**：公告对象 `{ id, title, content, createdBy, createdAt }`
+
+**后端行为**：插入源记录 → 遍历 `status=1` 的用户逐条 `INSERT blog_notifications`（`type='announcement'`、`title/content` 同源、`link=NULL`、`source_id=新公告id`、`is_read=0`）。整个操作 `@Transactional`，扩散失败则回滚源记录。
+
+### 2. 公告列表（管理端）
+
+```
+GET /api/announcements?page=1&pageSize=10（ADMIN）
+```
+
+返回 `PageResult`，每条含 `{ id, title, content, createdBy, createdAt, updatedAt }`，可附 `deliveredCount`（当前扩散副本数，供管理页展示「已送达 N 人」）。
+
+### 3. 编辑公告
+
+```
+PUT /api/announcements/{id}（ADMIN）
+Body: { "title", "content" }（同发布校验）
+```
+
+**后端行为**：更新源 → **同步更新全部扩散副本**（`UPDATE blog_notifications SET title=?, content=? WHERE type='announcement' AND source_id=?`）。`is_read` 不动——已读用户保持已读，未读保持未读（内容被更正而非重新提醒）。
+
+### 4. 删除公告
+
+```
+DELETE /api/announcements/{id}（ADMIN）
+```
+
+**后端行为**：**级联删除扩散副本**（`DELETE FROM blog_notifications WHERE type='announcement' AND source_id=?`）→ 删除源记录，`@Transactional`。
+**这是公告删除的唯一途径**——用户侧 `DELETE /notifications/{id}` 对 `type='announcement'` 返回 403「系统公告只能由管理员删除」。管理页删除确认文案需说明「删除后所有用户的该条公告通知将一并消失」。
+
+### 5. 前端接入约定（管理页）
+
+- `AdminLayout` 侧边栏新增「公告管理」入口（`/admin/announcements`），页面复用 AdminReview/AdminUsers 的卡片+表格风格
+- 功能：列表（分页）/ 新建（title + content textarea 弹窗）/ 编辑（同弹窗回填）/ 删除（二次确认含级联提示）
+- 通知侧（`Notifications.vue`）：`type='announcement'` 的行不渲染删除按钮；`NotificationType` 类型联合与 `TYPE_LABELS` 补 `announcement: '公告'`（tag 建议 warning 色，与普通系统通知区分）
+
+---
+
 ## 文件上传接口
 
 ### 1. 上传头像图片
@@ -2572,7 +2632,7 @@ Authorization: Bearer {accessToken}
 - 仅返回**当前登录用户**自己的通知，按 `createdAt` 倒序
 - `content` 已在生成时拼好触发者昵称（如「张三 回复了你的评论」），前端直接展示
 - 评论类通知 `link` 带锚点 `/article/{id}#comment-{commentId}`，跳转后定位到具体评论
-- `type` 枚举：`post_comment`（评论文章）/ `comment_reply`（回复评论）/ `comment_like`（评论被赞）/ `like`（文章被赞）/ `favorite`（文章被收藏）/ `follow`（被关注）/ `message`（收到私信）/ `system`（系统）。**前端 `tabOf` 按这些值分组**：post_comment/comment_reply/comment_like → 评论通知 tab；like/favorite → 点赞收藏 tab；其余 → 系统 tab。后端生成时必须用此枚举，自造值（如 post_like/comment_create）会全部落到系统分类
+- `type` 枚举：`post_comment`（评论文章）/ `comment_reply`（回复评论）/ `comment_like`（评论被赞）/ `like`（文章被赞）/ `favorite`（文章被收藏）/ `follow`（被关注）/ `message`（收到私信）/ `system`（系统）/ `announcement`（系统公告）。**前端 `tabOf` 按这些值分组**：post_comment/comment_reply/comment_like → 评论通知 tab；like/favorite → 点赞收藏 tab；其余（含 announcement）→ 系统 tab。后端生成时必须用此枚举，自造值（如 post_like/comment_create）会全部落到系统分类
 - 触发时机（均已接入）：顶级评论成功 → 文章作者收 `post_comment`；回复评论成功 → 被回复评论的作者收 `comment_reply`；评论点赞成功 → 评论作者收 `comment_like`；文章点赞/收藏成功 → 文章作者收 `like` / `favorite`。各触发点 try/catch 包裹（通知失败不影响主流程）；自己触发自己的动作不生成（防自扰）；取消点赞/收藏不撤回已发通知
 
 ---
@@ -2618,6 +2678,29 @@ Authorization: Bearer {accessToken}
 
 ---
 
+### 5. 删除单条通知
+
+```
+DELETE /notifications/{id}
+Authorization: Bearer {accessToken}
+```
+
+**返回**：`{ "code": 200 }`
+
+**错误情况**
+
+- 401: 未登录
+- 403: `type='announcement'`（系统公告只能由管理员删除，见「系统公告接口」）
+- 404: 通知不存在或非本人
+
+**备注**
+
+- **物理删除**（通知是个人收件箱数据，删了即消失，无软删字段）
+- 仅能删除 `user_id` 等于当前用户的行（与标记已读同一防线）
+- 删除未读通知后 `unread-count` 自然减一（计数按行算，无需额外处理）
+
+---
+
 ### 前端接入约定
 
 - 顶部导航铃铛（`Header.vue`，登录态显示）：进入页面拉一次 `unread-count` 展示红点；不做轮询、无 WebSocket（实时性要求不高）
@@ -2626,6 +2709,8 @@ Authorization: Bearer {accessToken}
 - `/notifications` 页按 `?tab=` 预选模块；`?tab=` 缺失或非法时统一落到 `comment` 并回写 URL；页内切 tab 会同步回 URL（刷新/分享不丢状态）
 - 页内点某条通知：先 `PUT .../read` 再 `router.push(link)` 跳转到对应文章/评论位置
 - **锚点定位链路**（评论点赞通知已接入）：后端 link 形如 `/article/{postId}#comment-{commentId}`；`CommentSection.vue`（inline 变体）在评论加载完成后解析 `route.hash`，必要时展开「查看全部」并扩大展示批次，`nextTick` 后按 `id="comment-{commentId}"` 找 DOM（带重试）`scrollIntoView`，目标评论黄色高亮 2.5s；已在文章页时监听 `route.hash` 再次触发。已触发 `comment_like`：`BlogPostCommentService.likeComment` 在 `saveLike` 成功后调 `createNotification`（try/catch 包裹，通知失败不影响点赞）
+- **通知删除**（待前端实现）：通知行提供「删除」入口（`DELETE /notifications/{id}`），成功后行移除、未读时未读数减一；`type='announcement'` 的行**不显示删除按钮**（公告只能由管理员从源头删除）
+- **系统公告的用户接收方式**：管理员发布公告时后端**写时扩散**——给每个正常状态（`status=1`）用户的通知表插入一条 `type='announcement'` 记录（`source_id` 指向公告源）。因此用户**不需要任何新接口/新页面**：铃铛红点自动 +1、系统 tab 直接可见、点开走既有 `markRead` 即已读。编辑公告同步更新所有扩散副本的 title/content（已读状态不变）；删除公告级联删除全部副本（用户侧该条通知消失）
 
 ---
 
@@ -2987,14 +3072,32 @@ CREATE TABLE blog_links (
 CREATE TABLE blog_notifications (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   user_id INT NOT NULL COMMENT '接收用户ID',
-  type VARCHAR(30) NOT NULL COMMENT 'post_comment/comment_reply/comment_like/like/favorite/follow/message/system',
+  type VARCHAR(30) NOT NULL COMMENT 'post_comment/comment_reply/comment_like/like/favorite/follow/message/system/announcement',
   title VARCHAR(100) NOT NULL,
   content VARCHAR(500) NOT NULL,
   link VARCHAR(255) DEFAULT NULL,
+  source_id BIGINT DEFAULT NULL COMMENT '公告扩散副本指向 blog_announcements.id；普通通知为 NULL',
   is_read TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0=未读,1=已读',
   created_at DATETIME NOT NULL
 );
 ```
+
+> **`source_id` 加列说明**（系统公告设计新增）：用于公告副本的编辑同步与删除级联。一期可不重新生成 jOOQ 类——Repository 里用 `DSL.field("source_id", Long.class)` 内联读写；二期再跑 jOOQ codegen 换成类型安全字段。
+
+#### blog_announcements 表（系统公告源）
+
+```sql
+CREATE TABLE blog_announcements (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  title VARCHAR(100) NOT NULL,
+  content TEXT NOT NULL,
+  created_by INT NOT NULL COMMENT '发布管理员ID → blog_users',
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME DEFAULT NULL
+);
+```
+
+> 新表需走既有链路：JPA 实体 + `ddl-auto=update` 建表 → 重新生成 jOOQ 类 → Repository/Service。用户不直接读此表（从通知表消费扩散副本）。
 
 ### 七、日志统计
 
