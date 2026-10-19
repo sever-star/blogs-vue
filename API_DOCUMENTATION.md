@@ -661,12 +661,25 @@ Authorization: Bearer {accessToken}
 ```
 PUT /posts/{id}/reject
 Authorization: Bearer {accessToken}
+Content-Type: application/json
 ```
 
 **URL 参数**
 | 参数 | 类型 | 说明 |
 |-----|------|------|
 | id | number | 文章 ID |
+
+**请求体**
+
+```json
+{
+  "reason": "第三段有错别字，封面图不清晰"
+}
+```
+
+| 参数 | 类型 | 说明 |
+|-----|------|------|
+| reason | string | **驳回理由，必填**（前端强制非空，1-200 字符）；后端用于生成驳回通知告知作者 |
 
 **返回**（更新后的完整文章对象，`status` 置为 `0`、`review_status` 置为 `2`）
 
@@ -685,8 +698,17 @@ Authorization: Bearer {accessToken}
 **错误情况**
 
 - 401: 未登录
-- 400: 文章已是拒绝状态（review_status = 2）
+- 400: 文章已是拒绝状态（review_status = 2）/ reason 缺失或超长
 - 404: 文章不存在
+
+**联动：驳回通知**
+
+- 驳回成功后给文章作者生成一条 `type='system'` 的审核结果通知，`content` 含驳回理由（如「你的文章《标题》被驳回：{reason}」），link 指向文章（作者从通知直达 `/write/{id}` 修改亦可）
+- 通过（approve）同样建议生成 `type='system'` 通知（「已通过审核并发布」），与驳回对称
+
+**前端接入约定**
+
+- 管理员审核页驳回按钮改为 `ElMessageBox.prompt`（textarea）：必填驳回理由（非空校验 + 200 字上限），确认后 `rejectArticle(id, reason)` 发送 `{ reason }`
 
 ---
 

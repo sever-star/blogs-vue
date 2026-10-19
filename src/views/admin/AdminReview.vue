@@ -202,18 +202,34 @@ async function handleApprove(row: ArticleListItem) {
 }
 
 async function handleReject(row: ArticleListItem) {
+  // 驳回必须给理由：会随请求发给后端，并通过审核结果通知告知作者
+  let reason = ''
   try {
-    await ElMessageBox.confirm(`确定驳回「${row.title}」吗？文章将退回草稿。`, '审核', {
-      type: 'warning',
-      confirmButtonText: '驳回',
-      cancelButtonText: '取消',
-    })
+    const { value } = await ElMessageBox.prompt(
+      `驳回「${row.title}」，文章将退回草稿。请填写驳回理由，将通知给作者：`,
+      '审核驳回',
+      {
+        type: 'warning',
+        confirmButtonText: '驳回',
+        cancelButtonText: '取消',
+        inputType: 'textarea',
+        inputPlaceholder: '例如：第三段有错别字，封面图不清晰',
+        inputValue: '',
+        inputValidator: (v: string) => {
+          const t = (v ?? '').trim()
+          if (!t) return '请输入驳回理由'
+          if (t.length > 200) return '驳回理由不能超过 200 个字符'
+          return true
+        },
+      }
+    )
+    reason = String(value ?? '').trim()
   } catch {
-    return
+    return // 用户取消
   }
   actingId.value = row.id
   try {
-    await rejectArticle(row.id)
+    await rejectArticle(row.id, reason)
     ElMessage.success('已驳回，文章退回草稿')
     detailVisible.value = false // 从弹窗内操作时同步关闭
     await loadPending()

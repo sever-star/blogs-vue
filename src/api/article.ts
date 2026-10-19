@@ -98,9 +98,11 @@ export const approveArticle = async (id: number): Promise<Article> => {
 /**
  * 审核驳回（status 2→0，退回草稿）
  * PUT /posts/{id}/reject
+ *
+ * reason 会随请求发给后端，用于生成驳回通知告知作者具体原因。
  */
-export const rejectArticle = async (id: number): Promise<Article> => {
-  return client.put(`/posts/${id}/reject`)
+export const rejectArticle = async (id: number, reason: string): Promise<Article> => {
+  return client.put(`/posts/${id}/reject`, { reason })
 }
 
 /**
