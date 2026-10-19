@@ -3048,23 +3048,9 @@ CREATE TABLE blog_refresh_tokens (
 );
 ```
 
-### 六、友链 / 通知
+### 六、通知 / 公告
 
-#### blog_links 表（友情链接）
-
-```sql
-CREATE TABLE blog_links (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  name VARCHAR(50) NOT NULL,
-  url VARCHAR(255) NOT NULL,
-  logo VARCHAR(255) DEFAULT NULL,
-  description VARCHAR(200) DEFAULT NULL,
-  sort_order INT NOT NULL DEFAULT 0 COMMENT '数字越大越靠前',
-  status TINYINT NOT NULL DEFAULT 1 COMMENT '1=显示,0=隐藏',
-  created_at DATETIME NOT NULL,
-  updated_at DATETIME NOT NULL
-);
-```
+> **`blog_links`（友情链接）表已于 2026-10-19 物理删除**（空表、无代码引用）。
 
 #### blog_notifications 表（站内通知）
 
@@ -3086,36 +3072,25 @@ CREATE TABLE blog_notifications (
 
 #### blog_announcements 表（系统公告源）
 
+> **已于 2026-10-19 在库中实际创建**（PostgreSQL，容器 pgvector-db），每列带 `COMMENT ON` 注释。用户不直接读此表（经通知表扩散副本消费）。
+
 ```sql
 CREATE TABLE blog_announcements (
-  id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  title VARCHAR(100) NOT NULL,
-  content TEXT NOT NULL,
-  created_by INT NOT NULL COMMENT '发布管理员ID → blog_users',
-  created_at DATETIME NOT NULL,
-  updated_at DATETIME DEFAULT NULL
+  id BIGSERIAL PRIMARY KEY,              -- 公告ID，自增主键；通知扩散副本的 source_id 回指此列
+  title VARCHAR(100) NOT NULL,           -- 公告标题，1-100字符，同步到通知副本的 title
+  content TEXT NOT NULL,                 -- 公告正文，1-2000字符，同步到通知副本的 content
+  created_by INT NOT NULL,               -- 发布管理员的用户ID → blog_users.id
+  created_at TIMESTAMP NOT NULL DEFAULT now(),  -- 发布时间
+  updated_at TIMESTAMP NULL              -- 最后编辑时间，未编辑过为 NULL
 );
+COMMENT ON TABLE blog_announcements IS '系统公告：管理员发布，用户经通知表扩散副本（type=announcement, source_id 指向本表）接收';
 ```
 
-> 新表需走既有链路：JPA 实体 + `ddl-auto=update` 建表 → 重新生成 jOOQ 类 → Repository/Service。用户不直接读此表（从通知表消费扩散副本）。
+> 后续实现需跑 jOOQ codegen（`mvn generate-sources`）生成 `com.syt.blog.jooq` 下的类，再写 Repository/Service（项目无 JPA 实体，表结构直接在库中维护）。
 
 ### 七、日志统计
 
-#### blog_login_logs 表（登录日志）
-
-```sql
-CREATE TABLE blog_login_logs (
-  id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  user_id INT DEFAULT NULL,
-  username VARCHAR(50) DEFAULT NULL COMMENT '冗余用户名',
-  login_type TINYINT NOT NULL DEFAULT 1 COMMENT '1=账密,2=手机,3=第三方',
-  ip VARCHAR(45) NOT NULL,
-  user_agent VARCHAR(255) DEFAULT NULL,
-  status TINYINT NOT NULL DEFAULT 1 COMMENT '1=成功,0=失败',
-  fail_reason VARCHAR(100) DEFAULT NULL,
-  created_at DATETIME NOT NULL
-);
-```
+> **`blog_login_logs`（登录日志）表已于 2026-10-19 物理删除**（空表、无代码引用）。
 
 #### blog_operation_logs 表（操作审计日志）
 
