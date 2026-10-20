@@ -677,8 +677,8 @@ Content-Type: application/json
 }
 ```
 
-| 参数 | 类型 | 说明 |
-|-----|------|------|
+| 参数   | 类型   | 说明                                                                         |
+| ------ | ------ | ---------------------------------------------------------------------------- |
 | reason | string | **驳回理由，必填**（前端强制非空，1-200 字符）；后端用于生成驳回通知告知作者 |
 
 **返回**（更新后的完整文章对象，`status` 置为 `0`、`review_status` 置为 `2`）
@@ -2070,7 +2070,13 @@ Content-Type: application/json
 ## 系统公告接口（管理端）
 
 > **状态**：设计定稿，前后端均待实现。
-> **模型**：公告源存 `blog_announcements` 表；发布即**写时扩散**到每个正常用户的 `blog_notifications`（`type='announcement'`、`source_id` 指向源）。用户侧零新增接口——从铃铛系统 tab 直接消费。SecurityConfig 需为 `/api/announcements` 的 POST/PUT/DELETE（及管理端列表 GET）加 `hasAuthority("ADMIN")`，且必须声明在 `/api/**` 宽松规则之前。
+> **模型**：公告源存 `blog_announcements` 表；采用**按需物化**（lazy materialization）——发布只写源表，**不写扩散**；直到某用户实际拉取通知时才把它该公告补插进他自己的 `blog_notifications`（`type='announcement'`、`source_id` 指向源，靠唯一索引 `uq_notifications_user_source (user_id, source_id)` 防重）。用户侧零新增接口——从铃铛系统 tab 直接消费。
+>
+> **为什么用按需物化而非写时扩散**：写时扩散是发布时遍历全体 `status=1` 用户逐条插记录，插入量 = 用户数 × 公告数，绝大多数人可能从不打开通知，白白造行；按需物化把插入量从「发布时一次性全部」降到「仅活跃用户实际取到公告时才插」，**发布 O(1)**、索引驱逐 DDL 大范围/大用户量下的写放大消除，且列表/已读/删除仍复用既有通知逻辑。
+>
+> **未读数/系统 tab 的补插时机**：用户进入通知页或调 `unread-count/通知列表` 时，先查源表是否有「已发布、且我尚未物化」的公告，有则补插副本再返回（物化在读取路径上）。
+>
+> SecurityConfig 需为 `/api/announcements` 的 POST/PUT/DELETE（及管理端列表 GET）加 `hasAuthority("ADMIN")`，且必须声明在 `/api/**` 宽松规则之前。
 
 ### 1. 发布公告
 
@@ -2084,14 +2090,14 @@ Content-Type: application/json
 { "title": "系统维护通知", "content": "本周六 02:00-04:00 系统维护，期间无法发文。" }
 ```
 
-| 参数 | 类型 | 说明 |
-|-----|------|------|
-| title | string | 必填，1-100 字符 |
-| content | string | 必填，1-2000 字符 |
+| 参数    | 类型   | 说明                          |
+| ------- | ------ | ----------------------------- |
+| title   | string | 必填，1-100 字符              |
+| content | string | 必填，1-450 字符（见下方容量说明） |
 
 **返回**：公告对象 `{ id, title, content, createdBy, createdAt }`
 
-**后端行为**：插入源记录 → 遍历 `status=1` 的用户逐条 `INSERT blog_notifications`（`type='announcement'`、`title/content` 同源、`link=NULL`、`source_id=新公告id`、`is_read=0`）。整个操作 `@Transactional`，扩散失败则回滚源记录。
+**后端行为**：仅 `INSERT blog_announcements` 源记录（含 `created_by=当前管理员`、`created_at=now`）。**不做任何扩散**——不需要遍历用户，单条插入即可（O(1)）。无需 `@Transactional` 包扩散（没有扩散）。
 
 ### 2. 公告列表（管理端）
 
@@ -2099,7 +2105,7 @@ Content-Type: application/json
 GET /api/announcements?page=1&pageSize=10（ADMIN）
 ```
 
-返回 `PageResult`，每条含 `{ id, title, content, createdBy, createdAt, updatedAt }`，可附 `deliveredCount`（当前扩散副本数，供管理页展示「已送达 N 人」）。
+返回 `PageResult`，每条含 `{ id, title, content, createdBy, createdAt, updatedAt }`，可附 `deliveredCount`（**当前已物化的副本数**，即「已触达 N 人」——按需物化下不等于用户总数，仅表示已实际取到该公告的用户数）。
 
 ### 3. 编辑公告
 
@@ -2108,7 +2114,8 @@ PUT /api/announcements/{id}（ADMIN）
 Body: { "title", "content" }（同发布校验）
 ```
 
-**后端行为**：更新源 → **同步更新全部扩散副本**（`UPDATE blog_notifications SET title=?, content=? WHERE type='announcement' AND source_id=?`）。`is_read` 不动——已读用户保持已读，未读保持未读（内容被更正而非重新提醒）。
+**后端行为**：更新源表 → **同步更新已物化的副本**（`UPDATE blog_notifications SET title=?, content=? WHERE type='announcement' AND source_id=?`）。`is_read` 不动——已读用户保持已读，未读保持未读（内容被更正而非重新提醒）。
+**尚未物化的用户不受影响**：他们下次拉取时从源表拿到的是更新后的新内容（按需物化天然保证「越晚看到越新」）。
 
 ### 4. 删除公告
 
@@ -2116,8 +2123,11 @@ Body: { "title", "content" }（同发布校验）
 DELETE /api/announcements/{id}（ADMIN）
 ```
 
-**后端行为**：**级联删除扩散副本**（`DELETE FROM blog_notifications WHERE type='announcement' AND source_id=?`）→ 删除源记录，`@Transactional`。
-**这是公告删除的唯一途径**——用户侧 `DELETE /notifications/{id}` 对 `type='announcement'` 返回 403「系统公告只能由管理员删除」。管理页删除确认文案需说明「删除后所有用户的该条公告通知将一并消失」。
+**后端行为**：**级联删除已物化的副本**（`DELETE FROM blog_notifications WHERE type='announcement' AND source_id=?`）→ 删除源记录，`@Transactional`。
+**这是公告删除的唯一途径**——用户侧 `DELETE /notifications/{id}` 对 `type='announcement'` 返回 403「系统公告只能由管理员删除」。管理页删除确认文案需说明「删除后已收到该公告用户的该条通知将一并消失」。
+**尚未物化的用户无需清理**：删除源后他们下次拉取时在源表里查不到该公告，自然补齐不了，也不会残留。
+
+**容量说明（content 为何上限 450）**：公告的已物化副本会把 `content` 原样写入 `blog_notifications.content`，而该列是 `VARCHAR(500)`（含生成时拼入的触发者昵称前缀另有占用）。因此公告 `content` 上限定为 **450 字符**，确保副本插入不超列宽；若将来要发超长公告，需先把 `blog_notifications.content` 扩为 TEXT。
 
 ### 5. 前端接入约定（管理页）
 
@@ -2591,11 +2601,11 @@ Authorization: Bearer {accessToken}
 
 **Query 参数**
 
-| 参数 | 类型 | 必需 | 说明 |
-|-----|------|------|------|
-| page | number | 否 | 页码，默认 1 |
-| pageSize | number | 否 | 每页条数，默认 10 |
-| onlyUnread | boolean | 否 | 只看未读，默认 false |
+| 参数       | 类型    | 必需 | 说明                 |
+| ---------- | ------- | ---- | -------------------- |
+| page       | number  | 否   | 页码，默认 1         |
+| pageSize   | number  | 否   | 每页条数，默认 10    |
+| onlyUnread | boolean | 否   | 只看未读，默认 false |
 
 **返回**（`PageResult` 结构）
 
@@ -2710,7 +2720,7 @@ Authorization: Bearer {accessToken}
 - 页内点某条通知：先 `PUT .../read` 再 `router.push(link)` 跳转到对应文章/评论位置
 - **锚点定位链路**（评论点赞通知已接入）：后端 link 形如 `/article/{postId}#comment-{commentId}`；`CommentSection.vue`（inline 变体）在评论加载完成后解析 `route.hash`，必要时展开「查看全部」并扩大展示批次，`nextTick` 后按 `id="comment-{commentId}"` 找 DOM（带重试）`scrollIntoView`，目标评论黄色高亮 2.5s；已在文章页时监听 `route.hash` 再次触发。已触发 `comment_like`：`BlogPostCommentService.likeComment` 在 `saveLike` 成功后调 `createNotification`（try/catch 包裹，通知失败不影响点赞）
 - **通知删除**（待前端实现）：通知行提供「删除」入口（`DELETE /notifications/{id}`），成功后行移除、未读时未读数减一；`type='announcement'` 的行**不显示删除按钮**（公告只能由管理员从源头删除）
-- **系统公告的用户接收方式**：管理员发布公告时后端**写时扩散**——给每个正常状态（`status=1`）用户的通知表插入一条 `type='announcement'` 记录（`source_id` 指向公告源）。因此用户**不需要任何新接口/新页面**：铃铛红点自动 +1、系统 tab 直接可见、点开走既有 `markRead` 即已读。编辑公告同步更新所有扩散副本的 title/content（已读状态不变）；删除公告级联删除全部副本（用户侧该条通知消失）
+- **系统公告的用户接收方式（按需物化）**：管理员发布公告只写 `blog_announcements` 源表，**不主动扩散**。用户进入通知页或拉取未读数/通知列表时，后端先查「已发布、且我（`user_id`）尚未物化」的公告，有则补插一条 `type='announcement'`、`source_id` 指向源的副本（唯一索引防重）再返回。因此用户**不需要任何新接口/新页面**：铃铛红点自动 +1、系统 tab 直接可见、点开走既有 `markRead` 即已读。编辑公告同步更新**已物化**副本的 title/content、未物化用户下次拉到新内容（已读状态不变）；删除公告级联删除**已物化**副本、未物化用户自然不再补齐
 
 ---
 
@@ -3062,7 +3072,7 @@ CREATE TABLE blog_notifications (
   title VARCHAR(100) NOT NULL,
   content VARCHAR(500) NOT NULL,
   link VARCHAR(255) DEFAULT NULL,
-  source_id BIGINT DEFAULT NULL COMMENT '公告扩散副本指向 blog_announcements.id；普通通知为 NULL',
+  source_id BIGINT DEFAULT NULL COMMENT '按需物化的公告副本指向 blog_announcements.id；普通通知为 NULL。与(user_id)组成唯一索引 uq_notifications_user_source 防重插',
   is_read TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0=未读,1=已读',
   created_at DATETIME NOT NULL
 );
@@ -3072,18 +3082,18 @@ CREATE TABLE blog_notifications (
 
 #### blog_announcements 表（系统公告源）
 
-> **已于 2026-10-19 在库中实际创建**（PostgreSQL，容器 pgvector-db），每列带 `COMMENT ON` 注释。用户不直接读此表（经通知表扩散副本消费）。
+> **已于 2026-10-19 在库中实际创建**（PostgreSQL，容器 pgvector-db），每列带 `COMMENT ON` 注释。用户不直接读此表（经通知表**按需物化**副本消费）。
 
 ```sql
 CREATE TABLE blog_announcements (
-  id BIGSERIAL PRIMARY KEY,              -- 公告ID，自增主键；通知扩散副本的 source_id 回指此列
+  id BIGSERIAL PRIMARY KEY,              -- 公告ID，自增主键；通知表按需物化副本的 source_id 回指此列
   title VARCHAR(100) NOT NULL,           -- 公告标题，1-100字符，同步到通知副本的 title
   content TEXT NOT NULL,                 -- 公告正文，1-2000字符，同步到通知副本的 content
   created_by INT NOT NULL,               -- 发布管理员的用户ID → blog_users.id
   created_at TIMESTAMP NOT NULL DEFAULT now(),  -- 发布时间
   updated_at TIMESTAMP NULL              -- 最后编辑时间，未编辑过为 NULL
 );
-COMMENT ON TABLE blog_announcements IS '系统公告：管理员发布，用户经通知表扩散副本（type=announcement, source_id 指向本表）接收';
+COMMENT ON TABLE blog_announcements IS '系统公告：管理员发布（只写本表），用户拉取通知时按需物化到通知表（type=announcement, source_id 指向本表），unique(user_id,source_id) 防重';
 ```
 
 > 后续实现需跑 jOOQ codegen（`mvn generate-sources`）生成 `com.syt.blog.jooq` 下的类，再写 Repository/Service（项目无 JPA 实体，表结构直接在库中维护）。
