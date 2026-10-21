@@ -86,9 +86,12 @@ Content-Type: application/json
 ```json
 {
   "username": "string (3-20 字符)",
-  "password": "string (6-32 字符)"
+  "password": "string (6-32 字符)",
+  "force": false
 }
 ```
+
+> `force`（可选，默认 false）：该账号已有活跃会话时是否**强制下线其他设备并登录**。见「5. 单会话登录」。
 
 **返回**
 
@@ -123,6 +126,7 @@ Content-Type: application/json
 - 401: 用户名或密码错误
 - 400: 参数校验失败
 - 403: 账号已被禁用（业务码 403002）
+- 409: 账号已在其他设备登录（业务码 409001，`force=true` 时跳过此检查；见「5. 单会话登录」）
 
 **备注**
 
@@ -130,6 +134,7 @@ Content-Type: application/json
 - 前端将 `accessToken` 保存至 `localStorage`（不记录过期时间，靠 401001 被动刷新）
 - 后续所有需要认证的请求都需在 `Authorization` 头中带上 `Bearer ${accessToken}`
 - accessToken 过期后，前端自动调用 `POST /auth/refresh` 无感刷新
+- **单会话约束**：该账号已有活跃会话（存在未吊销且未过期的 refreshToken）时，登录返回 409001 拒绝；前端可提示「已在其他设备登录」并提供「强制下线并登录」（重发请求带 `force: true`）
 
 ---
 
@@ -263,6 +268,50 @@ Cookie: refreshToken=...   (httpOnly，由浏览器自动携带，无需手动�
 - **rotation 策略**：每次刷新都会作废旧 refreshToken 并签发新 refreshToken（新 cookie 覆盖旧 cookie）
 - 前端在任意请求收到 401 时自动调用此接口，成功后重试原请求；多个并发 401 只触发一次刷新（请求队列合并）
 - 刷新也失败（refreshToken 过期）时，前端清除本地状态并跳回首页
+
+---
+
+### 5. 单会话登录（拒绝重复登录 + token_version 立即失效）
+
+> 目标：同一账号**同时只允许一个活跃会话**。核心是两件事——
+> ① 登录时若已有活跃会话则**拒绝**（除非显式 `force: true` 强制下线旧会话）；
+> ② 任何会话被终结（登出 / 改密 / 强制下线）时，**旧的 access token 立即失效**，
+>    不依赖 15 分钟自然过期（access token 是无状态 JWT，单吊销 refresh token 做不到这一点）。
+
+**机制：`blog_users.token_version` 会话版本号**
+
+- `blog_users` 新增 `token_version BIGINT NOT NULL DEFAULT 0`（见「数据库表结构 · 五、认证令牌」）
+- access token 签发时携带当前版本（JWT claim `tv`）
+- `JwtAuthenticationFilter` 每请求已 `findById` 拉取用户行，**顺带比对** `user.tokenVersion` 与 token 的 `tv`：
+  - 相等 → 正常放行（现在就有每请求查库，比对零额外查询）
+  - 不相等 → 按 401 处理（`fail(...)` 记原因，交给 EntryPoint），前端走 401→refresh→refresh 被吊销→强制登出链路
+- **版本 +1 的时机**：① 每次登录成功（含 `force` 强制登录）；② 登出；③ 修改密码。**`/refresh` 不 +1**——它是同会话续期，自己的浏览器正常刷新不能把自己的 access token 打死
+
+**登录校验（改 `BlogUserService.login`）**
+
+```
+登录 → 校验账号密码 → 校验 status → 
+  force==false 且存在活跃会话（SELECT EXISTS(refresh_tokens WHERE user_id=? AND revoked=0 AND expires_at>now)）
+    → 抛 BusinessException(409001, "账号已在其他设备登录")
+  force==true  → revokeAllByUserId(userId)（吊销全部旧 refresh token）
+  token_version + 1 → 签发携带新版本的 access/refresh token → 保存 refresh token 行 → Set-Cookie
+```
+
+**各端点改动汇总**
+
+| 端点 | 改动 |
+|---|---|
+| `POST /auth/login` | 加活跃会话校验（409001）；`force=true` 时先 `revokeAllByUserId`；登录成功 bump `token_version` |
+| `POST /auth/refresh` | 不 bump 版本；签发新 access token 时**带上用户当前 `token_version`**（需查一次用户行） |
+| `POST /auth/logout` | 吊销 refresh token（已有）+ bump `token_version`（旧 access token 立即失效） |
+| `PUT /auth/me/password` | `revokeAllByUserId`（已有）+ bump `token_version` |
+| `JwtAuthenticationFilter` | `findById` 后比对 `tokenVersion` 与 claim `tv`，不匹配 → 401 |
+
+**前端接入约定**
+
+- 登录失败 `code===409001`：`LoginModal` 提示「该账号已在其他设备登录」，提供「强制下线其他设备并登录」——用 `force: true` 重发登录请求（`api/auth.ts` 的 `login` 增加 `force` 参数）
+- 被终结的旧设备：下一次请求 401 → 自动刷新 → refresh token 已被吊销 → 前端 `forceLogout('登录已失效，请重新登录')` 回首页弹登录框。现有 [client.ts](../src/api/client.ts) 链路无需改动
+- 可选优化：版本不匹配的 401 可用独立业务码（如 `401004`「账号已在其他设备登录」）让被踢设备的提示更明确，需同步改 `client.ts` 的 `forceLogout` 文案
 
 ---
 
@@ -3039,6 +3088,16 @@ CREATE TABLE blog_scheduled_posts (
 ```
 
 ### 五、认证令牌
+
+#### blog_users 单会话列（单会话登录新增）
+
+> 单会话设计（见「认证相关接口 · 5. 单会话登录」）：会话版本号，终结旧会话时立即作废其全部 access token。
+
+```sql
+ALTER TABLE blog_users ADD COLUMN token_version BIGINT NOT NULL DEFAULT 0;
+COMMENT ON COLUMN blog_users.token_version IS
+  '会话版本号：登录成功/登出/改密 +1；access token 携带该版本，JwtAuthenticationFilter 每请求与库中值比对，不匹配即 401';
+```
 
 #### blog_refresh_tokens 表（刷新令牌）
 
