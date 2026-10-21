@@ -102,10 +102,10 @@ async function load() {
   total.value = notifStore.total
 }
 
-/** 点通知：标记已读并跳转到对应文章/评论位置（公告无跳转，仅标记已读） */
+/** 点通知：标记已读并跳转到对应文章/评论位置（公告内容直接展示在通知里，无落地页，只标已读不跳转） */
 async function handleClick(n: Notification) {
   await notifStore.markRead(n)
-  if (n.link) router.push(n.link)
+  if (n.type !== 'announcement' && n.link) router.push(n.link)
 }
 
 /** 删除单条通知（公告不渲染删除按钮，后端也会 403 拦截） */
