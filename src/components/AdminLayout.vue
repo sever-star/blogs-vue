@@ -23,6 +23,10 @@
           <el-icon><DocumentChecked /></el-icon>
           <span>文章审核</span>
         </el-menu-item>
+        <el-menu-item index="/admin/announcements">
+          <el-icon><Bell /></el-icon>
+          <span>公告管理</span>
+        </el-menu-item>
         <el-menu-item index="/admin/users">
           <el-icon><User /></el-icon>
           <span>用户管理</span>
@@ -40,7 +44,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { CollectionTag, DocumentChecked, Folder, User } from '@element-plus/icons-vue'
+import { Bell, CollectionTag, DocumentChecked, Folder, User } from '@element-plus/icons-vue'
 
 const route = useRoute()
 

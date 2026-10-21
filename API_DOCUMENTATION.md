@@ -2719,7 +2719,7 @@ Authorization: Bearer {accessToken}
 - `/notifications` 页按 `?tab=` 预选模块；`?tab=` 缺失或非法时统一落到 `comment` 并回写 URL；页内切 tab 会同步回 URL（刷新/分享不丢状态）
 - 页内点某条通知：先 `PUT .../read` 再 `router.push(link)` 跳转到对应文章/评论位置
 - **锚点定位链路**（评论点赞通知已接入）：后端 link 形如 `/article/{postId}#comment-{commentId}`；`CommentSection.vue`（inline 变体）在评论加载完成后解析 `route.hash`，必要时展开「查看全部」并扩大展示批次，`nextTick` 后按 `id="comment-{commentId}"` 找 DOM（带重试）`scrollIntoView`，目标评论黄色高亮 2.5s；已在文章页时监听 `route.hash` 再次触发。已触发 `comment_like`：`BlogPostCommentService.likeComment` 在 `saveLike` 成功后调 `createNotification`（try/catch 包裹，通知失败不影响点赞）
-- **通知删除**（待前端实现）：通知行提供「删除」入口（`DELETE /notifications/{id}`），成功后行移除、未读时未读数减一；`type='announcement'` 的行**不显示删除按钮**（公告只能由管理员从源头删除）
+- **通知删除**（已实现）：通知行提供「删除」入口（`DELETE /notifications/{id}`，`@click.stop` 防触发整行跳转，先 `ElMessageBox.confirm` 确认），成功后行移除、未读时未读数减一；`type='announcement'` 的行**不显示删除按钮**（公告只能由管理员从源头删除）
 - **系统公告的用户接收方式（按需物化）**：管理员发布公告只写 `blog_announcements` 源表，**不主动扩散**。用户进入通知页或拉取未读数/通知列表时，后端先查「已发布、且我（`user_id`）尚未物化」的公告，有则补插一条 `type='announcement'`、`source_id` 指向源的副本（唯一索引防重）再返回。因此用户**不需要任何新接口/新页面**：铃铛红点自动 +1、系统 tab 直接可见、点开走既有 `markRead` 即已读。编辑公告同步更新**已物化**副本的 title/content、未物化用户下次拉到新内容（已读状态不变）；删除公告级联删除**已物化**副本、未物化用户自然不再补齐
 
 ---
@@ -3088,7 +3088,7 @@ CREATE TABLE blog_notifications (
 CREATE TABLE blog_announcements (
   id BIGSERIAL PRIMARY KEY,              -- 公告ID，自增主键；通知表按需物化副本的 source_id 回指此列
   title VARCHAR(100) NOT NULL,           -- 公告标题，1-100字符，同步到通知副本的 title
-  content TEXT NOT NULL,                 -- 公告正文，1-2000字符，同步到通知副本的 content
+  content TEXT NOT NULL,                 -- 公告正文，1-450字符，同步到通知副本的 content
   created_by INT NOT NULL,               -- 发布管理员的用户ID → blog_users.id
   created_at TIMESTAMP NOT NULL DEFAULT now(),  -- 发布时间
   updated_at TIMESTAMP NULL              -- 最后编辑时间，未编辑过为 NULL

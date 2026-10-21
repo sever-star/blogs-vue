@@ -113,6 +113,7 @@ export type NotificationType =
   | 'follow' // 有人关注你
   | 'message' // 收到私信
   | 'system' // 系统通知
+  | 'announcement' // 系统公告（管理员发布，按需物化；仅管理员可从源头删除）
 
 /** 站内通知（content 已由后端拼好，直接展示） */
 export interface Notification {
@@ -125,6 +126,17 @@ export interface Notification {
   /** 0=未读 1=已读（后端 short） */
   isRead: number
   createdAt: string
+}
+
+/** 系统公告（管理端；用户侧经通知表按需物化副本消费，不读此结构） */
+export interface Announcement {
+  id: number
+  title: string
+  content: string
+  /** 发布管理员 id */
+  createdBy: number
+  createdAt: string
+  updatedAt: string | null
 }
 
 // ============ 请求体 ============

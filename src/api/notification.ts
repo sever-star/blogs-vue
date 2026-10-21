@@ -27,3 +27,11 @@ export const markNotificationRead = async (id: number): Promise<void> => {
 export const markAllNotificationsRead = async (): Promise<void> => {
   await client.put('/notifications/read-all')
 }
+
+/**
+ * 删除单条通知 DELETE /notifications/{id}
+ * 仅能删自己；type='announcement' 会被后端拒绝（403，公告只能由管理员从源头删除）
+ */
+export const deleteNotification = async (id: number): Promise<void> => {
+  await client.delete(`/notifications/${id}`)
+}

@@ -6,6 +6,7 @@ import {
   getUnreadCount,
   markNotificationRead,
   markAllNotificationsRead,
+  deleteNotification,
 } from '@/api/notification'
 
 /** 通知页的分类模块（无「全部」：铃铛本体默认进第一个分类 comment） */
@@ -100,6 +101,20 @@ export const useNotificationStore = defineStore('notification', () => {
     }
   }
 
+  /** 删除单条通知（type='announcement' 后端会拒绝，前端不提供入口） */
+  const remove = async (id: number) => {
+    try {
+      await deleteNotification(id)
+      const removed = list.value.find(n => n.id === id)
+      list.value = list.value.filter(n => n.id !== id)
+      if (removed && removed.isRead === 0 && unreadCount.value > 0) {
+        unreadCount.value -= 1
+      }
+    } catch (e) {
+      console.error('删除通知失败:', e)
+    }
+  }
+
   /** 登出时清空，避免下个账号看到上一个的未读 */
   const clear = () => {
     list.value = []
@@ -118,6 +133,7 @@ export const useNotificationStore = defineStore('notification', () => {
     visibleList,
     markRead,
     markAllRead,
+    remove,
     clear,
   }
 })

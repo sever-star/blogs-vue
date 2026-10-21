@@ -42,6 +42,17 @@
             <div class="notif-row">
               <el-tag size="small" :type="tagType(n.type)" effect="light">{{ tagLabel(n.type) }}</el-tag>
               <span class="notif-time">{{ formatTime(n.createdAt) }}</span>
+              <!-- 系统公告只能由管理员从源头删除，普通用户不提供删除入口 -->
+              <el-button
+                v-if="n.type !== 'announcement'"
+                class="notif-delete"
+                link
+                type="danger"
+                size="small"
+                @click.stop="handleDelete(n)"
+              >
+                删除
+              </el-button>
             </div>
             <p class="notif-content">{{ n.content }}</p>
           </div>
@@ -69,6 +80,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotificationStore, NOTIFICATION_TABS } from '@/stores/notification'
 import type { NotificationTab } from '@/stores/notification'
@@ -90,10 +102,24 @@ async function load() {
   total.value = notifStore.total
 }
 
-/** 点通知：标记已读并跳转到对应文章/评论位置 */
+/** 点通知：标记已读并跳转到对应文章/评论位置（公告无跳转，仅标记已读） */
 async function handleClick(n: Notification) {
   await notifStore.markRead(n)
   if (n.link) router.push(n.link)
+}
+
+/** 删除单条通知（公告不渲染删除按钮，后端也会 403 拦截） */
+async function handleDelete(n: Notification) {
+  try {
+    await ElMessageBox.confirm('确定删除这条通知吗？', '删除通知', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
+  await notifStore.remove(n.id)
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -105,6 +131,7 @@ const TYPE_LABELS: Record<string, string> = {
   follow: '关注',
   message: '私信',
   system: '系统',
+  announcement: '公告',
 }
 function tagLabel(t: NotificationType): string {
   return TYPE_LABELS[t] ?? '通知'
@@ -120,6 +147,8 @@ function tagType(t: NotificationType): 'primary' | 'success' | 'warning' | 'info
       return 'warning'
     case 'follow':
       return 'success'
+    case 'announcement':
+      return 'warning'
     case 'message':
       return 'info'
     default:
@@ -282,6 +311,10 @@ onMounted(async () => {
 .notif-time {
   font-size: 12px;
   color: #9ca3af;
+}
+
+.notif-delete {
+  margin-left: auto;
 }
 
 .notif-content {
