@@ -3092,11 +3092,13 @@ CREATE TABLE blog_scheduled_posts (
 #### blog_users 单会话列（单会话登录新增）
 
 > 单会话设计（见「认证相关接口 · 5. 单会话登录」）：会话版本号，终结旧会话时立即作废其全部 access token。
+>
+> **已于 2026-10-21 在库中实际执行**（PostgreSQL，容器 pgvector-db，库 postgres），带 `COMMENT ON COLUMN` 注解；已有行回填 0。
 
 ```sql
-ALTER TABLE blog_users ADD COLUMN token_version BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE blog_users ADD COLUMN IF NOT EXISTS token_version BIGINT NOT NULL DEFAULT 0;
 COMMENT ON COLUMN blog_users.token_version IS
-  '会话版本号：登录成功/登出/改密 +1；access token 携带该版本，JwtAuthenticationFilter 每请求与库中值比对，不匹配即 401';
+  '会话版本号：登录成功/登出/改密时 +1；access token 签发时携带该版本（JWT claim tv），JwtAuthenticationFilter 每请求与库中值比对，不匹配即按 401 处理，旧会话的 access token 立即失效';
 ```
 
 #### blog_refresh_tokens 表（刷新令牌）
