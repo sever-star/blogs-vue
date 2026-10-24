@@ -1,4 +1,4 @@
-import client, { API_BASE_URL } from './client'
+import client, { API_BASE_URL, refreshAccessToken } from './client'
 import { getAccessToken } from '@/utils/token'
 
 // ============ 类型 ============
@@ -129,19 +129,35 @@ export const streamAiChat = async (
   handlers: AiStreamHandlers,
   signal?: AbortSignal
 ): Promise<void> => {
-  const token = getAccessToken()
-  const response = await fetch(`${API_BASE_URL}/ai/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(payload),
-    signal,
-  })
+  // 闭包封装 fetch：刷新拿到新 token 后重试时复用同一份请求构造
+  const chatFetch = (token: string | null): Promise<Response> =>
+    fetch(`${API_BASE_URL}/ai/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+      signal,
+    })
 
-  // 限流、参数校验、未配置 Key 等都在开始生成前返回，走统一的 JSON 错误体
+  let response = await chatFetch(getAccessToken())
+
+  // accessToken 过期/无效：后端 chat 接口现在返回 HTTP 401 + JSON { code:401001, message }（不再走 SSE）。
+  // 走共享串行刷新拿新 token 后重试一次——refreshAccessToken 单例保证并发的多个 AI 请求
+  // 只刷新一次，不会撞 refresh token 轮换。刷新失败（refresh token 也无效）时 client.ts 已 forceLogout。
+  if (response.status === 401) {
+    let newToken: string
+    try {
+      newToken = await refreshAccessToken()
+    } catch {
+      throw new AiStreamError('登录已过期，请重新登录')
+    }
+    response = await chatFetch(newToken)
+  }
+
+  // 限流、参数校验、未配置 Key、（重试后仍 401：账号被禁用等）都在生成前返回，走统一的 JSON 错误体
   if (!response.ok) {
     throw new AiStreamError(await readErrorMessage(response))
   }

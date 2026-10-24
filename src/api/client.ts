@@ -62,9 +62,14 @@ client.interceptors.request.use(
 
 // ---- 静默刷新（双 token 机制） ----
 
-// 是否正在刷新（避免并发请求同时触发多次刷新）
-let isRefreshing = false
-// 刷新期间挂起的请求队列，刷新成功后统一用新 token 重试
+// 进行中的刷新 Promise（全应用单例）：同一时刻只发一次 /auth/refresh，
+// 并发调用复用同一个 Promise，避免 refresh token 轮换策略下「多个并发刷新
+// 互相把对方手里的 token 轮换掉」（详见 P2 笔记）。axios 响应拦截器与
+// streamAiChat 的裸 fetch 共用这一把锁。
+let refreshPromise: Promise<string> | null = null
+
+// 刷新期间挂起的【axios】请求队列，刷新成功后统一用新 token 重试。
+// streamAiChat 走裸 fetch，不进此队列——它自己 await refreshAccessToken()。
 let pendingQueue: Array<{
   resolve: (token: string) => void
   reject: (error: unknown) => void
@@ -73,13 +78,44 @@ let pendingQueue: Array<{
 type RetryableConfig = InternalAxiosRequestConfig & { _retry?: boolean }
 
 /**
- * 用新 token 重试一个请求（标记 _retry 避免再次失败时死循环）。
- * 刷新请求走 client（而非裸 axios），这样 mock 拦截器也能覆盖到。
- * 失败时（refresh token 无效）会再次进入响应拦截器，靠 `config.url === '/auth/refresh'`
- * 分支识别并强制登出，避免死循环。
+ * 实际发起一次 /auth/refresh（走 client 让 mock 拦截器也能覆盖到）。
+ * 走 httpOnly cookie，不携带 accessToken；成功后存新 token 并返回。
+ * 失败（refresh token 也无效）时，响应拦截器的 `/auth/refresh` 分支会 forceLogout，
+ * 这里只需把错误向上抛。
  */
-async function refreshAccessToken(): Promise<AuthResponse> {
-  return client.post('/auth/refresh', null, { withCredentials: true })
+async function doRefresh(): Promise<string> {
+  const res = await client.post('/auth/refresh', null, { withCredentials: true }) as unknown as AuthResponse
+  setAccessToken(res.accessToken)
+  return res.accessToken
+}
+
+/**
+ * 全应用共享的「刷新并拿新 accessToken」入口（单例去重）。
+ * 进行中只发一次，并发调用拿到同一个 Promise → 同一把新 token，
+ * 杜绝并发刷新撞 refresh token 轮换。供 axios 响应拦截器与 streamAiChat 共用。
+ *
+ * 队列释放也在这里做：无论刷新由谁发起（axios 拦截器还是 streamAiChat 裸 fetch），
+ * 成功后都要把刷新期间挂起的 axios 请求统一用新 token 重试，否则会永久挂起。
+ */
+export function refreshAccessToken(): Promise<string> {
+  if (refreshPromise) return refreshPromise
+  refreshPromise = doRefresh()
+    .then((token) => {
+      // 刷新成功：释放挂起的 axios 请求队列，统一用新 token 重试
+      pendingQueue.forEach(({ resolve }) => resolve(token))
+      pendingQueue = []
+      return token
+    })
+    .catch((err) => {
+      // 刷新失败：拒绝挂起队列（forceLogout 已由响应拦截器的 /auth/refresh 分支处理）
+      pendingQueue.forEach(({ reject }) => reject(err))
+      pendingQueue = []
+      throw err
+    })
+    .finally(() => {
+      refreshPromise = null
+    })
+  return refreshPromise
 }
 
 function retryWithToken(config: RetryableConfig, token: string) {
@@ -149,8 +185,9 @@ client.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    // 已有刷新在进行 → 挂起当前请求，等新 token 到了再重试
-    if (isRefreshing) {
+    // 已有刷新在进行（全应用共享单例）→ 挂起当前请求，刷新成功后由
+    // refreshAccessToken 内部统一用新 token 重试，失败则 reject
+    if (refreshPromise) {
       return new Promise((resolve, reject) => {
         pendingQueue.push({
           resolve: (token: string) => resolve(retryWithToken(config, token)),
@@ -159,25 +196,14 @@ client.interceptors.response.use(
       })
     }
 
-    // 发起刷新
-    isRefreshing = true
+    // 发起刷新（streamAiChat 裸 fetch 与本拦截器共用 refreshAccessToken 单例）。
+    // 队列释放已在 refreshAccessToken 内部处理，这里只负责重试当前请求。
     try {
-      const res = await refreshAccessToken()
-      setAccessToken(res.accessToken)
-      const newToken = res.accessToken
-
-      // 释放挂起队列
-      pendingQueue.forEach(({ resolve }) => resolve(newToken))
-      pendingQueue = []
-      isRefreshing = false
-
-      // 重试当前请求
+      const newToken = await refreshAccessToken()
       return retryWithToken(config, newToken)
     } catch (refreshError) {
-      pendingQueue.forEach(({ reject }) => reject(refreshError))
-      pendingQueue = []
-      isRefreshing = false
-      forceLogout('登录已失效，请重新登录')
+      // doRefresh 走 client.post('/auth/refresh')，失败时响应拦截器的
+      // /auth/refresh 分支已 forceLogout，这里不再重复跳转，仅向上抛错
       return Promise.reject(refreshError)
     }
   }
