@@ -2702,8 +2702,21 @@ Authorization: Bearer {accessToken}
 **返回**
 
 ```json
-{ "code": 200, "message": "操作成功", "data": { "count": 3 } }
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "count": 3,
+    "byType": {
+      "post_comment": 1,
+      "like": 1,
+      "announcement": 1
+    }
+  }
+}
 ```
+
+> `count`：总未读数（铃铛徽标用，向后兼容）。`byType`：按**原始 type** 分组的未读数（一次 `GROUP BY type` 查询产出），前端按 `tabOf` 聚合成 5 个 tab 的角标：comment ← post_comment/comment_reply/comment_like；like ← like/favorite；follow ← follow；message ← message；system ← system/announcement。`byType` 缺失或某 type 不在表里时按 0 处理。
 
 ---
 
@@ -2759,6 +2772,7 @@ Authorization: Bearer {accessToken}
 ### 前端接入约定
 
 - 顶部导航铃铛（`Header.vue`，登录态显示）：进入页面拉一次 `unread-count` 展示红点；不做轮询、无 WebSocket（实时性要求不高）
+- **按分类的未读数（已实现）**：`unread-count` 同时返回 `byType`（原始 type → 未读数），前端 `tabOf` 聚合成 5 个 tab 的角标：通知页每个 tab chip 显示该分类未读数（>0 时），铃铛浮层每个快捷入口同样显示；`markRead` / `remove` 减对应 tab、`markAllRead` 清零，与总数同步
 - **通知页无「全部」分类**：只有五个模块 tab（评论通知/点赞收藏/关注/私信/系统），默认激活第一个 `comment`
 - **悬浮铃铛**弹出五个分类快捷入口（评论通知/点赞收藏/关注/私信/系统），点击跳 `/notifications?tab={key}` 预选模块；**点铃铛本体**默认进第一个分类：`/notifications?tab=comment`
 - `/notifications` 页按 `?tab=` 预选模块；`?tab=` 缺失或非法时统一落到 `comment` 并回写 URL；页内切 tab 会同步回 URL（刷新/分享不丢状态）

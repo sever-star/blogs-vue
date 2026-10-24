@@ -70,6 +70,10 @@
               >
                 <el-icon><component :is="entry.icon" /></el-icon>
                 <span>{{ entry.label }}</span>
+                <span
+                  v-if="notifStore.unreadByTab[entry.tab] > 0"
+                  class="quick-badge"
+                >{{ notifStore.unreadByTab[entry.tab] }}</span>
                 <el-icon class="quick-arrow"><ArrowRight /></el-icon>
               </div>
             </div>
@@ -381,6 +385,20 @@ const handleCommand = (command: string) => {
   margin-left: auto;
   font-size: 12px;
   color: #9ca3af;
+}
+
+/* 快捷入口的未读数角标（紧贴标签右侧；箭头仍靠最右） */
+.quick-badge {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  color: #fff;
+  background: #f56c6c;
+  border-radius: 999px;
 }
 
 .notif-quick-item:hover .quick-arrow {

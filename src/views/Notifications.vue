@@ -17,6 +17,10 @@
           @click="notifStore.activeTab = tab.key"
         >
           {{ tab.label }}
+          <span
+            v-if="notifStore.unreadByTab[tab.key] > 0"
+            class="notif-tab-badge"
+          >{{ notifStore.unreadByTab[tab.key] }}</span>
         </span>
         <el-button
           class="mark-all"
@@ -255,6 +259,25 @@ onMounted(async () => {
   background: #ecf5ff;
   color: #3b82f6;
   font-weight: 500;
+}
+
+.notif-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: #f56c6c;
+  border-radius: 999px;
+}
+
+.notif-tab.active .notif-tab-badge {
+  background: #3b82f6;
 }
 
 .mark-all {

@@ -13,8 +13,9 @@ export const getNotifications = async (
   return client.get('/notifications', { params: { page, pageSize, onlyUnread } })
 }
 
-/** 未读数 GET /notifications/unread-count */
-export const getUnreadCount = async (): Promise<{ count: number }> => {
+/** 未读数 GET /notifications/unread-count
+ *  count：总未读数（铃铛徽标）；byType：按原始 type 分组的未读数（供 tab 角标聚合） */
+export const getUnreadCount = async (): Promise<{ count: number; byType?: Record<string, number> }> => {
   return client.get('/notifications/unread-count')
 }
 

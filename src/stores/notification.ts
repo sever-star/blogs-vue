@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Notification } from '@/types'
+import type { Notification, NotificationType } from '@/types'
 import {
   getNotifications,
   getUnreadCount,
@@ -20,9 +20,14 @@ export const NOTIFICATION_TABS = [
 
 export type NotificationTab = (typeof NOTIFICATION_TABS)[number]['key']
 
-/** 某条通知归到哪个 tab */
-function tabOf(n: Notification): NotificationTab {
-  switch (n.type) {
+/** 各 tab 未读计数初始空表 */
+function emptyTabs(): Record<NotificationTab, number> {
+  return { comment: 0, like: 0, follow: 0, message: 0, system: 0 }
+}
+
+/** 某条通知（按原始 type）归到哪个 tab */
+function tabOf(type: NotificationType): NotificationTab {
+  switch (type) {
     case 'post_comment':
     case 'comment_reply':
     case 'comment_like':
@@ -42,6 +47,8 @@ function tabOf(n: Notification): NotificationTab {
 export const useNotificationStore = defineStore('notification', () => {
   const list = ref<Notification[]>([])
   const unreadCount = ref(0)
+  /** 各分类的未读数（按 tab 聚合，由后端 byType 派生） */
+  const unreadByTab = ref<Record<NotificationTab, number>>(emptyTabs())
   const loading = ref(false)
   const activeTab = ref<NotificationTab>('comment')
   const total = ref(0)
@@ -51,8 +58,16 @@ export const useNotificationStore = defineStore('notification', () => {
     try {
       const res = await getUnreadCount()
       unreadCount.value = Number(res?.count ?? 0)
+      // 后端返回 byType（原始 type → 未读数），前端按 tabOf 聚合成 5 个 tab
+      const next = emptyTabs()
+      const byType = res?.byType ?? {}
+      for (const [type, n] of Object.entries(byType)) {
+        next[tabOf(type as NotificationType)] += Number(n) || 0
+      }
+      unreadByTab.value = next
     } catch {
       unreadCount.value = 0
+      unreadByTab.value = emptyTabs()
     }
   }
 
@@ -73,16 +88,18 @@ export const useNotificationStore = defineStore('notification', () => {
 
   /** 当前 tab 下展示的通知（前端分组，避免为每个分类多打一个接口） */
   const visibleList = () => {
-    return list.value.filter(n => tabOf(n) === activeTab.value)
+    return list.value.filter(n => tabOf(n.type) === activeTab.value)
   }
 
-  /** 标记单条已读（成功后本地置已读 + 未读数减一） */
+  /** 标记单条已读（成功后本地置已读 + 总数与对应 tab 各减一） */
   const markRead = async (n: Notification) => {
     if (n.isRead === 1) return
     try {
       await markNotificationRead(n.id)
       n.isRead = 1
       if (unreadCount.value > 0) unreadCount.value -= 1
+      const tab = tabOf(n.type)
+      if (unreadByTab.value[tab] > 0) unreadByTab.value[tab] -= 1
     } catch (e) {
       console.error('标记已读失败:', e)
     }
@@ -96,6 +113,7 @@ export const useNotificationStore = defineStore('notification', () => {
         n.isRead = 1
       })
       unreadCount.value = 0
+      unreadByTab.value = emptyTabs()
     } catch (e) {
       console.error('全部已读失败:', e)
     }
@@ -107,8 +125,10 @@ export const useNotificationStore = defineStore('notification', () => {
       await deleteNotification(id)
       const removed = list.value.find(n => n.id === id)
       list.value = list.value.filter(n => n.id !== id)
-      if (removed && removed.isRead === 0 && unreadCount.value > 0) {
-        unreadCount.value -= 1
+      if (removed && removed.isRead === 0) {
+        if (unreadCount.value > 0) unreadCount.value -= 1
+        const tab = tabOf(removed.type)
+        if (unreadByTab.value[tab] > 0) unreadByTab.value[tab] -= 1
       }
     } catch (e) {
       console.error('删除通知失败:', e)
@@ -119,12 +139,14 @@ export const useNotificationStore = defineStore('notification', () => {
   const clear = () => {
     list.value = []
     unreadCount.value = 0
+    unreadByTab.value = emptyTabs()
     activeTab.value = 'comment'
   }
 
   return {
     list,
     unreadCount,
+    unreadByTab,
     loading,
     activeTab,
     total,
