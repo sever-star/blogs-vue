@@ -2529,6 +2529,85 @@ Content-Type: multipart/form-data
 - 无需认证；用于图片等二进制附件的 OSS 中转上传
 - 文本类文件（txt/md/csv/json/代码等）不走本接口，由前端直接读成文本后放进 `attachments[].content`
 
+### 8. 生成文章标题
+
+**请求**
+
+```
+POST /ai/generate-title
+Content-Type: application/json
+Authorization: Bearer {accessToken}   // 必需
+```
+
+**入参（JSON）**
+
+| 字段      | 类型   | 必需 | 说明                                       |
+| --------- | ------ | ---- | ------------------------------------------ |
+| contentMd | string | 是   | 文章正文（Markdown），后端截断至 6000 字后送模型 |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "title": "从零实现 SSE 流式输出"
+  }
+}
+```
+
+**错误情况**
+
+- 400: contentMd 为空
+- 401: 未登录（游客）；或 accessToken 过期/无效（业务码 401001 等），前端走 axios 自动刷新重试
+- 503: AI 服务未配置 Key、上游报错或超时
+
+**备注**
+
+- 非流式一次性返回；生成结果截断至 50 字以内
+- 每次调用（含失败）都记入 `blog_ai_usage` 审计表（type=title，ref_type=post，ref_id 为空——生成时文章尚未落库）
+
+### 9. 生成文章摘要
+
+**请求**
+
+```
+POST /ai/generate-summary
+Content-Type: application/json
+Authorization: Bearer {accessToken}   // 必需
+```
+
+**入参（JSON）**
+
+| 字段      | 类型   | 必需 | 说明                                         |
+| --------- | ------ | ---- | -------------------------------------------- |
+| contentMd | string | 是   | 文章正文（Markdown），后端截断至 6000 字     |
+| title     | string | 否   | 文章标题，作为上下文辅助生成                 |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "summary": "本文介绍如何用 SSE 实现大模型流式输出，涵盖前后端完整链路。"
+  }
+}
+```
+
+**错误情况**
+
+- 400: contentMd 为空
+- 401: 未登录（游客）；或 accessToken 过期/无效
+- 503: AI 服务未配置 Key、上游报错或超时
+
+**备注**
+
+- 生成结果截断至 120 字以内；调用记入 `blog_ai_usage`（type=summary）
+- 前端写文章页在标题与摘要输入框旁均有「AI 生成」按钮，调用本组接口后回填，用户可再手动编辑
+
 ---
 
 ## 文章相关接口（补充）
@@ -3279,6 +3358,28 @@ CREATE TABLE blog_ai_messages (
   tokens INT UNSIGNED DEFAULT 0 COMMENT '消耗Token数',
   status TINYINT NOT NULL DEFAULT 1 COMMENT '1=成功,0=生成中,2=失败/违规',
   created_at DATETIME NOT NULL
+);
+```
+
+#### blog_ai_usage 表（非对话类 AI 调用审计）
+
+标题/摘要生成等一次性 AI 调用不进会话体系，统一记这里（成功与失败都记）。实际建表脚本见后端 `docs/blog-ai-usage-schema.sql`（PostgreSQL 语法，已在库中执行）。
+
+```sql
+CREATE TABLE blog_ai_usage (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT DEFAULT NULL COMMENT '登录用户',
+  user_ip VARCHAR(45) DEFAULT NULL,
+  type VARCHAR(20) NOT NULL COMMENT 'title=生成标题,summary=生成摘要',
+  ref_type VARCHAR(20) DEFAULT NULL COMMENT '关联对象类型，当前为 post',
+  ref_id BIGINT DEFAULT NULL COMMENT '关联对象 id；生成时文章未落库故为空',
+  input_text TEXT COMMENT '送模型的输入（已截断）',
+  output_text TEXT COMMENT '模型输出；失败为 NULL',
+  tokens INT NOT NULL DEFAULT 0,
+  model VARCHAR(64) COMMENT '调用的模型名',
+  status SMALLINT NOT NULL DEFAULT 1 COMMENT '0=失败,1=成功',
+  error_message VARCHAR(500) COMMENT '失败原因',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
 

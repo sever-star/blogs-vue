@@ -93,6 +93,28 @@ export const uploadAiAttachment = async (file: File): Promise<AiUploadResult> =>
   })
 }
 
+// ============ 文章标题/摘要生成（非流式，记录到 blog_ai_usage） ============
+
+/**
+ * AI 生成文章标题
+ * POST /ai/generate-title，body { contentMd }，返回 { title }
+ * 需登录；accessToken 过期由 client 拦截器自动刷新重试。
+ */
+export const generateArticleTitle = async (contentMd: string): Promise<string> => {
+  const res: { title: string } = await client.post('/ai/generate-title', { contentMd })
+  return res.title
+}
+
+/**
+ * AI 生成文章摘要
+ * POST /ai/generate-summary，body { contentMd, title? }，返回 { summary }
+ * title 作为上下文可选；需登录。
+ */
+export const generateArticleSummary = async (contentMd: string, title?: string): Promise<string> => {
+  const res: { summary: string } = await client.post('/ai/generate-summary', { contentMd, title })
+  return res.summary
+}
+
 // ============ 流式对话 ============
 
 /** 流式回调集合 */

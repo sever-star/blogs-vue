@@ -40,13 +40,47 @@
       <el-form :model="formData" label-width="90px">
         <!-- 文章标题 -->
         <el-form-item label="文章标题" required>
-          <el-input
-            v-model="formData.title"
-            placeholder="请输入文章标题"
-            clearable
-            maxlength="100"
-            show-word-limit
-          />
+          <div class="field-with-ai">
+            <el-input
+              v-model="formData.title"
+              placeholder="请输入文章标题"
+              clearable
+              maxlength="100"
+              show-word-limit
+              class="field-with-ai__input"
+            />
+            <el-button
+              class="ai-btn"
+              :loading="generatingTitle"
+              @click="handleGenerateTitle"
+            >
+              <el-icon v-if="!generatingTitle"><MagicStick /></el-icon>
+              AI 生成
+            </el-button>
+          </div>
+        </el-form-item>
+
+        <!-- 文章摘要（可选）：可点 AI 生成后编辑，也可手写；随提交落库 -->
+        <el-form-item label="文章摘要">
+          <div class="field-with-ai">
+            <el-input
+              v-model="formData.summary"
+              type="textarea"
+              :rows="3"
+              placeholder="可选；可点击 AI 生成后编辑，也可手动填写"
+              maxlength="200"
+              show-word-limit
+              class="field-with-ai__input"
+            />
+            <el-button
+              class="ai-btn ai-btn--align-top"
+              :loading="generatingSummary"
+              @click="handleGenerateSummary"
+            >
+              <el-icon v-if="!generatingSummary"><MagicStick /></el-icon>
+              AI 生成
+            </el-button>
+          </div>
         </el-form-item>
 
         <!-- 文章分类 -->
@@ -137,9 +171,10 @@ import { useAuthStore } from '@/stores/auth'
 import { useCategoryStore } from '@/stores/category'
 import { createTag } from '@/api/tag'
 import { uploadCover } from '@/api/upload'
+import { generateArticleTitle, generateArticleSummary } from '@/api/ai'
 import { ElMessage } from 'element-plus'
 import type { UploadFile } from 'element-plus'
-import { Loading } from '@element-plus/icons-vue'
+import { Loading, MagicStick } from '@element-plus/icons-vue'
 import { MdEditor as MDEditor } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
 
@@ -181,6 +216,7 @@ const formData = ref({
   tags: [] as string[],
   content: '',
   coverImage: '',
+  summary: '',
 })
 
 // 编辑器渲染出的 HTML（onHtmlChanged 回调产出），随创建/更新提交给后端存 content_html
@@ -195,6 +231,49 @@ const availableTags = computed(() => articleStore.tags.map((tag) => tag.name))
 // ---- 封面上传 ----
 
 const coverUploading = ref(false)
+
+// ---- AI 生成标题/摘要（按钮在信息弹窗里，调用后端 /ai/generate-* 接口） ----
+
+const generatingTitle = ref(false)
+const generatingSummary = ref(false)
+
+/** 正文太短时模型无意义，给个兜底提示而非空跑一次计费调用 */
+function requireEnoughContent(): string | null {
+  const content = formData.value.content.trim()
+  if (content.length < 20) {
+    ElMessage.warning('正文内容太少，请先写一些再生成')
+    return null
+  }
+  return content
+}
+
+/** AI 生成标题：用正文作输入，结果填回标题框，用户可再编辑 */
+async function handleGenerateTitle() {
+  const content = requireEnoughContent()
+  if (!content) return
+  generatingTitle.value = true
+  try {
+    formData.value.title = await generateArticleTitle(content)
+  } catch (error: any) {
+    ElMessage.error(error?.message || '标题生成失败，请重试或手动填写')
+  } finally {
+    generatingTitle.value = false
+  }
+}
+
+/** AI 生成摘要：可带标题作上下文，结果填回摘要框 */
+async function handleGenerateSummary() {
+  const content = requireEnoughContent()
+  if (!content) return
+  generatingSummary.value = true
+  try {
+    formData.value.summary = await generateArticleSummary(content, formData.value.title)
+  } catch (error: any) {
+    ElMessage.error(error?.message || '摘要生成失败，请重试或手动填写')
+  } finally {
+    generatingSummary.value = false
+  }
+}
 
 /** 选中本地封面：立即上传 OSS，拿到 URL 写入表单，提交时随 coverImage 一起保存 */
 async function handleCoverSelect(file: UploadFile) {
@@ -338,6 +417,7 @@ async function loadArticleForEdit() {
   formData.value.tags = article.tags.map((t) => t.name)
   formData.value.content = article.contentMd
   formData.value.coverImage = article.coverImage || ''
+  formData.value.summary = article.summary || ''
 }
 
 /**
@@ -383,6 +463,8 @@ async function handleConfirm() {
         tags: selectedTagIds,
         // 编辑时始终带当前值：空串表示用户移除了封面（后端收到非 null 才覆盖）
         coverImage: formData.value.coverImage.trim(),
+        // 摘要始终带当前值：空串表示用户清空了摘要（后端收到非 null 才覆盖）
+        summary: formData.value.summary,
         // 占位：编辑的发布/审核状态由后端按新语义决定
         // （草稿保持草稿 0，已发布的编辑期间下架 2，同时 review_status 归 0 重审）
         status: 0,
@@ -406,6 +488,8 @@ async function handleConfirm() {
       tags: selectedTagIds,
       // 创建时留空不传字段，cover_image 保持 NULL 而非空串；编辑草稿时同编辑逻辑带空串
       coverImage: formData.value.coverImage.trim() || undefined,
+      // 摘要可选：留空不传保持 NULL；编辑草稿时同编辑逻辑带空串以便覆盖
+      summary: formData.value.summary.trim() || undefined,
       status: 0,
     }
 
@@ -750,6 +834,28 @@ function handleLogin() {
   border: none !important;
   /* height 属性传 calc 不生效（组件内部按 px 处理），改用 CSS 强制撑满编辑区 */
   height: 100% !important;
+}
+
+/* 输入框 + AI 生成按钮：横排，按钮固定宽度不被挤压 */
+.field-with-ai {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.field-with-ai__input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-btn {
+  flex-shrink: 0;
+}
+
+/* 摘要为多行文本域：按钮与首行顶对齐，不随文本域高度垂直居中 */
+.ai-btn--align-top {
+  align-self: flex-start;
 }
 
 @media (max-width: 768px) {
