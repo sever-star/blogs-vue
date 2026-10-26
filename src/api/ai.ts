@@ -166,10 +166,16 @@ export const streamAiChat = async (
 
   let response = await chatFetch(getAccessToken())
 
-  // accessToken 过期/无效：后端 chat 接口现在返回 HTTP 401 + JSON { code:401001, message }（不再走 SSE）。
-  // 走共享串行刷新拿新 token 后重试一次——refreshAccessToken 单例保证并发的多个 AI 请求
-  // 只刷新一次，不会撞 refresh token 轮换。刷新失败（refresh token 也无效）时 client.ts 已 forceLogout。
+  // 401 分支与 client.ts 拦截器同一约定：**只有业务码 401001（accessToken 过期）才刷新**。
+  // 其余 401（401002 已吊销/被顶、401003 缺失…）刷新救不回来，直接抛错——
+  // 被顶设备不该拿已吊销的 refreshToken 白跑一趟刷新。
   if (response.status === 401) {
+    const errBody = await readErrorBody(response)
+    if (errBody?.code !== 401001) {
+      throw new AiStreamError(errBody?.message || '登录已失效，请重新登录')
+    }
+    // 过期：走共享串行刷新拿新 token 后重试一次——refreshAccessToken 单例保证并发的
+    // 多个 AI 请求只刷新一次，不会撞 refresh token 轮换。刷新失败时 client.ts 已 forceLogout。
     let newToken: string
     try {
       newToken = await refreshAccessToken()
@@ -254,13 +260,20 @@ function dispatch(chunk: string, handlers: AiStreamHandlers): string | null {
   }
 }
 
-/** 从统一响应体 { code, message } 中取出可展示的错误文案 */
-async function readErrorMessage(response: Response): Promise<string> {
+/** 读取统一错误响应体 { code, message }；非 JSON（网关错误页等）返回 null。注意会消费 body */
+async function readErrorBody(response: Response): Promise<{ code?: number; message?: string } | null> {
   try {
     const body = await response.json()
-    if (body?.message) return body.message
+    if (body && typeof body === 'object') return body
   } catch {
-    // 响应不是 JSON（如网关错误页），退回状态码提示
+    // 非 JSON，交给调用方走兜底文案
   }
+  return null
+}
+
+/** 从统一响应体 { code, message } 中取出可展示的错误文案 */
+async function readErrorMessage(response: Response): Promise<string> {
+  const body = await readErrorBody(response)
+  if (body?.message) return body.message
   return `请求失败（HTTP ${response.status}）`
 }

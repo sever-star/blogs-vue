@@ -157,9 +157,6 @@ client.interceptors.response.use(
     const status = error.response?.status
     const config = error.config as RetryableConfig | undefined
 
-    // 后端在 accessToken 过期时返回 HTTP 401 + body `{ code: 401001 }`。
-    // 这里以 HTTP 401 为刷新触发信号（不强制校验 code），
-    // 刷新失败或重试后仍 401 再强制登出，保证「未登录/无 cookie」也能正确收敛。
     if (status !== 401 || !config) {
       return Promise.reject(error.response?.data || error.message)
     }
@@ -177,11 +174,25 @@ client.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    // 已经重试过一次仍 401 → 新 token 也被拒。
-    // 这条路径几乎只在「账号被禁用」时出现：refresh 接口不查状态会成功发新 token，
-    // 但过滤器按 status=0 拦掉重试请求 → 命中此分支。给一个明确的提示而非静默登出。
+    // 只有业务码 401001（accessToken 过期）才发起静默刷新；
+    // 其余 401（401002 已吊销/被顶、401003 缺失、401005 在其他设备登录…）
+    // 刷新救不回来——被顶设备拿着已吊销的 refreshToken 刷新只会白跑一趟，
+    // 直接强制登出。这同时是单会话「顶掉旧会话」的前端收敛点。
+    const body = error.response?.data as { code?: number; message?: string } | undefined
+    const code = typeof body?.code === 'number' ? body.code : undefined
+    if (code !== 401001) {
+      forceLogout(
+        code === 401005
+          ? '账号已在其他设备登录，请重新登录'
+          : body?.message || '登录已失效，请重新登录'
+      )
+      return Promise.reject(error.response?.data || error.message)
+    }
+
+    // 已经重试过一次仍是 401001 → 刚换的新 token 也过期（异常场景，如系统时间错乱），
+    // 必须拦在这里，否则「刷新→重试→再刷新」会无限循环。
     if (config._retry) {
-      forceLogout('账号已被禁用或登录状态已失效，请重新登录')
+      forceLogout('登录状态已失效，请重新登录')
       return Promise.reject(error)
     }
 

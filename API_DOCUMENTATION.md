@@ -21,7 +21,7 @@
 - **Token 存储**:
   - `accessToken`：浏览器 `localStorage` 的 `accessToken` 字段（前端不记录过期时间，靠后端 401001 被动刷新）
   - `refreshToken`：httpOnly cookie，名称 `refreshToken`，前端 JS 不可读
-- **无感刷新**：accessToken 过期后，后端返回 HTTP 401 + body `{code: 401001}`，前端自动调用 `POST /auth/refresh`（携带 cookie）换新 accessToken，并重试原请求，用户无感知
+- **无感刷新**：accessToken 过期后，后端返回 HTTP 401 + body `{code: 401001}`，前端自动调用 `POST /auth/refresh`（携带 cookie）换新 accessToken，并重试原请求，用户无感知。**仅 `401001` 触发刷新**——其余 401 业务码（`401002` 已吊销/被顶、`401003` 缺失、`401005` 在其他设备登录等）刷新救不回来，不发刷新请求，直接 `forceLogout` 强制登出（单会话「顶掉旧会话」的前端收敛点）
 
 ---
 
@@ -306,8 +306,9 @@ Cookie: refreshToken=...   (httpOnly，由浏览器自动携带，无需手动�
 **前端接入约定**
 
 - 登录侧**无需改动**：新登录总是成功（顶掉旧会话，无 409001 分支，`login` 接口不增加参数）
-- 被顶掉的旧设备：下一次请求 401 → 自动刷新 → refresh token 已被吊销 → 前端 `forceLogout('登录已失效，请重新登录')` 回首页弹登录框。现有 [client.ts](../src/api/client.ts) 链路自动处理，无需改动
-- 可选优化：版本不匹配的 401 可用独立业务码（如 `401004`「账号已在其他设备登录」）让被踢设备的提示更明确，需同步改 `client.ts` 的 `forceLogout` 文案
+- 被顶掉的旧设备：下一次请求 401 + `code=401002` → **不发起刷新**（refresh token 已吊销，刷新只会白跑一趟），`client.ts` 直接 `forceLogout('Token 无效，请重新登录')` 回首页弹登录框。现有 [client.ts](../src/api/client.ts) 链路自动处理，无需改动
+- 刷新触发条件：**仅 `401001`**（见「通用响应格式 · 错误码说明」）；`streamAiChat` 裸 fetch 走同一约定
+- 可选优化：版本不匹配的 401 可用独立业务码 `401005`「账号已在其他设备登录」让被踢设备的提示更明确（`JwtAuthenticationFilter` 目前发 `401002`）；`client.ts` 已按 `401005` 准备好文案，后端改码即可生效
 
 ---
 
