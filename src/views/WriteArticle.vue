@@ -10,6 +10,9 @@
           </div>
         </div>
         <div class="toolbar-actions">
+          <el-tooltip content="粘贴 HTML 源码，转换为 Markdown 插入编辑器光标处" placement="bottom">
+            <el-button @click="htmlConvertVisible = true">HTML 转 MD</el-button>
+          </el-tooltip>
           <el-button v-if="!isEdit" :loading="publishing" @click="openMetaDialog('draft')">
             保存草稿
           </el-button>
@@ -22,6 +25,7 @@
       <!-- 编辑区域占满整页余下空间；粘贴监听挂在 window 捕获阶段（见 script） -->
       <div class="editor-area">
         <MDEditor
+          ref="mdEditorRef"
           v-model="formData.content"
           preview="edit"
           :on-html-changed="handleHtmlChanged"
@@ -160,6 +164,21 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- HTML → Markdown 手动转换：粘贴富文本是隐式自动转换的，
+         这里给显式入口，用于手头有 HTML 源码（DevTools 复制/保存的片段）的场景 -->
+    <el-dialog v-model="htmlConvertVisible" title="HTML → Markdown" width="640px" :close-on-click-modal="false">
+      <el-input
+        v-model="htmlInput"
+        type="textarea"
+        :rows="12"
+        placeholder="粘贴 HTML 源码（如 <h2>标题</h2><p>正文</p>），转换为 Markdown 插入编辑器光标处"
+      />
+      <template #footer>
+        <el-button @click="htmlConvertVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleHtmlConvert">转换并插入</el-button>
+      </template>
+    </el-dialog>
   </main>
 </template>
 
@@ -176,7 +195,9 @@ import { ElMessage } from 'element-plus'
 import type { UploadFile } from 'element-plus'
 import { Loading, MagicStick } from '@element-plus/icons-vue'
 import { MdEditor as MDEditor } from 'md-editor-v3'
+import type { ExposeParam } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
+import { htmlToMarkdown, hasStructuralHtml } from '@/utils/htmlToMarkdown'
 
 // md-editor-v3 插件（可选）
 const MDEditorMermaid = undefined
@@ -560,7 +581,7 @@ function handlePaste(e: ClipboardEvent) {
   // 不能拿纯文本猜 Markdown：AI 回答正文里的 **kwargs、行首 "- " 等会被
   // 旧正则 /^\s*[-*]\s|\*\*|/ 误判成「已是 Markdown」而跳过转换，
   // 富文本原样插入、格式全丢（这就是"复制到 Typora 有格式、这里没有"的原因）。
-  if (!/<(h[1-6]|strong|b|em|i|del|s|u|ins|ul|ol|li|pre|blockquote|table|a|code|img|hr|sup|sub)\b/i.test(html)) {
+  if (!hasStructuralHtml(html)) {
     console.info('[paste] HTML 无结构化标签，走默认插入')
     return
   }
@@ -581,114 +602,43 @@ function handlePaste(e: ClipboardEvent) {
   }
 }
 
-/** 剪贴板 HTML → Markdown（覆盖 DeepSeek 常渲染的标签） */
-function htmlToMarkdown(html: string): string {
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-  return renderMdChildren(doc.body)
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-}
+// ---- HTML → Markdown 手动转换（工具栏按钮） ----
 
-function renderMdChildren(node: Node): string {
-  let out = ''
-  node.childNodes.forEach((child) => {
-    out += renderMdNode(child)
-  })
-  return out
-}
+/** MDEditor 实例：用其 expose 的 insert 在光标处插入内容 */
+const mdEditorRef = ref<ExposeParam | null>(null)
+const htmlConvertVisible = ref(false)
+const htmlInput = ref('')
 
-function renderMdNode(node: Node): string {
-  if (node.nodeType === Node.TEXT_NODE) {
-    // 行内空白折叠成单个空格；块级标签自带 \n\n 分隔
-    return (node.textContent || '').replace(/\s+/g, ' ')
+function handleHtmlConvert() {
+  const raw = htmlInput.value.trim()
+  if (!raw) {
+    ElMessage.warning('请先粘贴 HTML 源码')
+    return
   }
-  if (node.nodeType !== Node.ELEMENT_NODE) return ''
-
-  const el = node as HTMLElement
-  const tag = el.tagName.toLowerCase()
-  const inner = renderMdChildren(el).trim()
-
-  switch (tag) {
-    case 'h1': case 'h2': case 'h3': case 'h4': case 'h5': case 'h6':
-      return `\n\n${'#'.repeat(Number(tag[1]))} ${inner}\n\n`
-    case 'p': case 'div': case 'section': case 'article': case 'figure':
-      return `\n\n${inner}\n\n`
-    case 'strong': case 'b':
-      return inner ? `**${inner}**` : ''
-    case 'em': case 'i':
-      return inner ? `*${inner}*` : ''
-    case 'span': case 'font': {
-      // 部分渲染器用样式而非语义标签做强调（<span style="font-weight:600">）
-      const style = el.getAttribute('style') || ''
-      if (/font-weight:\s*(bold|[5-9]00)/i.test(style)) return inner ? `**${inner}**` : ''
-      if (/font-style:\s*italic/i.test(style)) return inner ? `*${inner}*` : ''
-      return inner
-    }
-    case 'img':
-      return `![${el.getAttribute('alt') || ''}](${el.getAttribute('src') || ''})`
-    case 'del': case 's': case 'strike':
-      return inner ? `~~${inner}~~` : ''
-    case 'code':
-      // pre 里的 code 由 pre 分支处理，这里是行内代码
-      return el.parentElement?.tagName.toLowerCase() === 'pre'
-        ? (el.textContent ?? '')
-        : `\`${el.textContent?.trim() ?? ''}\``
-    case 'pre': {
-      const codeEl = el.querySelector('code')
-      const lang =
-        (codeEl?.className || el.className || '').match(/language-([\w-]+)/)?.[1] ?? ''
-      const body = (codeEl ?? el).textContent ?? ''
-      return `\n\n\`\`\`${lang}\n${body.replace(/\n+$/, '')}\n\`\`\`\n\n`
-    }
-    case 'a': {
-      const href = el.getAttribute('href') || ''
-      return href ? `[${inner}](${href})` : inner
-    }
-    case 'br':
-      return '\n'
-    case 'hr':
-      return '\n\n---\n\n'
-    case 'blockquote':
-      return `\n\n${inner.split('\n').map((line) => `> ${line}`).join('\n')}\n\n`
-    case 'ul':
-    case 'ol': {
-      const ordered = tag === 'ol'
-      const items = Array.from(el.children).filter(
-        (c) => c.tagName.toLowerCase() === 'li'
-      )
-      const lines = items.map((li, i) => {
-        const content = renderMdChildren(li).trim().replace(/\n+/g, '\n  ')
-        return `${ordered ? `${i + 1}.` : '-'} ${content}`
-      })
-      return lines.length ? `\n\n${lines.join('\n')}\n\n` : ''
-    }
-    case 'li':
-      return renderMdChildren(el)
-    case 'table':
-      return renderMdTable(el)
-    case 'style': case 'script': case 'meta': case 'link': case 'title':
-      return ''
-    default:
-      return inner || (el.textContent ?? '')
+  let md = ''
+  try {
+    md = htmlToMarkdown(raw)
+  } catch (error) {
+    console.error('[html2md] 转换失败:', error)
+    ElMessage.error('转换失败，请确认粘贴的是 HTML')
+    return
   }
-}
-
-/** 简易表格：首行当表头 */
-function renderMdTable(table: HTMLElement): string {
-  const rows = Array.from(table.querySelectorAll('tr'))
-  if (!rows.length) return ''
-  const lines: string[] = []
-  rows.forEach((tr, rowIndex) => {
-    const cells = Array.from(tr.children).map(
-      (cell) => (cell.textContent || '').trim().replace(/\|/g, '\\|')
-    )
-    lines.push(`| ${cells.join(' | ')} |`)
-    if (rowIndex === 0) {
-      lines.push(`| ${cells.map(() => '---').join(' | ')} |`)
-    }
-  })
-  return `\n\n${lines.join('\n')}\n\n`
+  if (!md) {
+    ElMessage.warning('未从 HTML 中解析出内容')
+    return
+  }
+  if (mdEditorRef.value) {
+    // 插入到编辑器当前光标处；generate 入参是当前选中内容，这里不需要
+    mdEditorRef.value.insert(() => ({ targetValue: md, select: false }))
+  } else {
+    // 兜底：拿不到编辑器实例时直接追加到正文末尾
+    formData.value.content = formData.value.content
+      ? formData.value.content.replace(/\n*$/, '\n\n') + md
+      : md
+  }
+  htmlConvertVisible.value = false
+  htmlInput.value = ''
+  ElMessage.success(`已转换并插入编辑器（${md.length} 字符）`)
 }
 
 function handleReset() {
