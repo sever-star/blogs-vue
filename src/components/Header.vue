@@ -107,7 +107,7 @@
                   <el-divider style="margin: 4px 0" />
                   <el-dropdown-item command="profile">
                     <el-icon><User /></el-icon>
-                    个人信息
+                    我的主页
                   </el-dropdown-item>
                   <el-dropdown-item command="my-articles">
                     <el-icon><Document /></el-icon>
@@ -216,8 +216,8 @@ const handleCommand = (command: string) => {
       window.open(router.resolve({ name: 'MyArticles' }).href, '_blank')
       break
     case 'settings':
-      // 账号设置即个人资料页（含修改密码卡片）
-      router.push('/profile')
+      // 账号设置独立页（个人信息 + 修改密码，自原个人信息页迁入）
+      router.push('/settings')
       break
     case 'logout':
       authStore.logout()

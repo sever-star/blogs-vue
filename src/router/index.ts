@@ -32,6 +32,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/settings',
+    name: 'Settings',
+    component: () => import('@/views/Settings.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     // 我的文章（含草稿），从头像菜单以新标签页打开
     path: '/my-articles',
     name: 'MyArticles',
