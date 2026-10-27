@@ -546,7 +546,9 @@ function handlePaste(e: ClipboardEvent) {
   const clipboard = e.clipboardData
   const html = clipboard?.getData('text/html') ?? ''
   const plain = clipboard?.getData('text/plain') ?? ''
-  console.info('[paste] html=%d字节, plain=%o', html.length, plain.slice(0, 80))
+  // 完整输出：定位「转换结果无标记」类问题需要看到原始 HTML 全貌
+  console.info('[paste] html(%d字节):', html.length, html)
+  console.info('[paste] plain:', plain)
 
   if (!clipboard || !html) {
     ElMessage.info('粘贴诊断:剪贴板没有 HTML 数据(仅纯文本)')
@@ -561,7 +563,7 @@ function handlePaste(e: ClipboardEvent) {
 
   try {
     const md = htmlToMarkdown(html)
-    console.info('[paste] 转换结果:', md.slice(0, 200))
+    console.info('[paste] 转换结果(%d字符):', md.length, md)
     if (!md || md === plain.trim()) {
       ElMessage.info(`粘贴诊断:HTML 转换后无变化(${html.length}字节)`)
       return
