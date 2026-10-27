@@ -141,6 +141,13 @@
           <el-tag v-if="isAuthor" type="primary" size="small" effect="light">
             我的文章
           </el-tag>
+          <!-- 关注/私信：先只放按钮（看自己文章不展示），交互后续接入 -->
+          <div v-else class="author-actions">
+            <el-button size="small" type="primary" plain @click="handleFollow">
+              关注
+            </el-button>
+            <el-button size="small" plain @click="handleMessage">私信</el-button>
+          </div>
         </el-card>
       </aside>
     </div>
@@ -276,6 +283,15 @@ function errorText(error: unknown, fallback: string): string {
 
 function handleEdit() {
   router.push(`/write/${articleId.value}`)
+}
+
+// 关注/私信：先占位，后续接关注关系与私信会话
+function handleFollow() {
+  ElMessage.info('关注功能开发中，敬请期待')
+}
+
+function handleMessage() {
+  ElMessage.info('私信功能开发中，敬请期待')
 }
 
 /** 下架文章（作者/管理员）：确认后调接口，store 同步 currentArticle.status，按钮随 canOffline 自动消失 */
@@ -568,6 +584,17 @@ function formatDate(dateString: string): string {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+/* 关注/私信按钮行：卡片底部，两枚等宽 */
+.author-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.author-actions .el-button {
+  flex: 1;
+  margin-left: 0;
 }
 
 .author-meta {
