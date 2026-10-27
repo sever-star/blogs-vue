@@ -119,6 +119,11 @@
           <span class="action-count">{{ articleStore.currentArticle.commentCount ?? 0 }}</span>
           <span class="action-label">评论</span>
         </button>
+        <!-- 复制 Markdown 源码：一键拿全文 md，无需从渲染区复制再转格式 -->
+        <button type="button" class="action-item" @click="handleCopyMd">
+          <el-icon><DocumentCopy /></el-icon>
+          <span class="action-label">复制MD</span>
+        </button>
       </div>
 
       <!-- 右栏：作者信息（文章加载完成后展示，窄屏落到文章下方） -->
@@ -169,7 +174,7 @@ import { useAuthStore } from '@/stores/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MdPreview as MDPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
-import { Star, StarFilled, ChatDotRound, User, Calendar, View, Edit, Close } from '@element-plus/icons-vue'
+import { Star, StarFilled, ChatDotRound, User, Calendar, View, Edit, Close, DocumentCopy } from '@element-plus/icons-vue'
 import CommentSection from '@/components/CommentSection.vue'
 
 const route = useRoute()
@@ -297,6 +302,33 @@ async function handleOffline() {
       error && typeof error === 'object' && 'message' in error ? String(error.message ?? '') : ''
     ElMessage.error(message || '下架失败，请重试')
     console.error('下架文章失败:', error)
+  }
+}
+
+/** 复制文章 Markdown 源码到剪贴板：一键拿全文 md（替代从渲染区复制再转格式的绕路做法） */
+async function handleCopyMd() {
+  const md = articleStore.currentArticle?.contentMd
+  if (!md) {
+    ElMessage.warning('这篇文章没有 Markdown 源码')
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(md)
+    ElMessage.success('已复制 Markdown 源码，可直接粘贴到编辑器')
+  } catch {
+    // 非安全上下文或权限被拒的兜底：临时 textarea + execCommand
+    const ta = document.createElement('textarea')
+    ta.value = md
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    ta.remove()
+    if (ok) {
+      ElMessage.success('已复制 Markdown 源码，可直接粘贴到编辑器')
+    } else {
+      ElMessage.error('复制失败，请手动选择正文复制')
+    }
   }
 }
 
