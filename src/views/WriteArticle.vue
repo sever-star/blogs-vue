@@ -551,13 +551,17 @@ function handlePaste(e: ClipboardEvent) {
   console.info('[paste] plain:', plain)
 
   if (!clipboard || !html) {
-    ElMessage.info('粘贴诊断:剪贴板没有 HTML 数据(仅纯文本)')
+    // 纯文本粘贴（DeepSeek 复制按钮的 Markdown 源码等）→ 走默认插入，原样保留
+    console.info('[paste] 无 HTML，走默认插入')
     return
   }
 
-  // 纯文本本身已是 Markdown（DeepSeek 复制按钮/代码块源码）→ 原样粘贴
-  if (/^#{1,6}\s|^\s*[-*]\s|^\s*\d+\.\s|\*\*|```/m.test(plain)) {
-    ElMessage.info('粘贴诊断:纯文本已是 Markdown,原样插入')
+  // 「值不值得转换」只看 HTML 里有没有结构化标签——与 Typora 同策略。
+  // 不能拿纯文本猜 Markdown：AI 回答正文里的 **kwargs、行首 "- " 等会被
+  // 旧正则 /^\s*[-*]\s|\*\*|/ 误判成「已是 Markdown」而跳过转换，
+  // 富文本原样插入、格式全丢（这就是"复制到 Typora 有格式、这里没有"的原因）。
+  if (!/<(h[1-6]|strong|b|em|i|del|s|u|ins|ul|ol|li|pre|blockquote|table|a|code|img|hr|sup|sub)\b/i.test(html)) {
+    console.info('[paste] HTML 无结构化标签，走默认插入')
     return
   }
 
@@ -614,6 +618,15 @@ function renderMdNode(node: Node): string {
       return inner ? `**${inner}**` : ''
     case 'em': case 'i':
       return inner ? `*${inner}*` : ''
+    case 'span': case 'font': {
+      // 部分渲染器用样式而非语义标签做强调（<span style="font-weight:600">）
+      const style = el.getAttribute('style') || ''
+      if (/font-weight:\s*(bold|[5-9]00)/i.test(style)) return inner ? `**${inner}**` : ''
+      if (/font-style:\s*italic/i.test(style)) return inner ? `*${inner}*` : ''
+      return inner
+    }
+    case 'img':
+      return `![${el.getAttribute('alt') || ''}](${el.getAttribute('src') || ''})`
     case 'del': case 's': case 'strike':
       return inner ? `~~${inner}~~` : ''
     case 'code':
