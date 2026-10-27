@@ -27,6 +27,16 @@ const turndown = new TurndownService({
 // GFM：表格、删除线、任务列表
 turndown.use(gfm)
 
+// 处理 span font-weight:bold 模拟加粗（DeepSeek常用）
+turndown.addRule('spanBold', {
+  filter: node => {
+    if (node.nodeName !== 'SPAN') return false
+    const style = node.getAttribute('style') || ''
+    return /font-weight\s*:\s*(bold|[7-9]00)/i.test(style)
+  },
+  replacement: (content) => `**${content}**`
+})
+
 // md-editor 预览的代码块用 <details><summary class="md-editor-code-head">语言 复制代码</summary>…
 // 包裹：summary 是 UI 控件（语言标签 + 复制按钮）不属于正文，丢弃；details 内容保留。
 turndown.addRule('mdEditorCodeHead', {
@@ -38,8 +48,11 @@ turndown.addRule('mdEditorCodeHead', {
 
 /** HTML 里是否存在值得转换的结构化标签（粘贴时转换与否的判据，与 Typora 同策略） */
 export function hasStructuralHtml(html: string): boolean {
+  // 增加匹配 span 带 font-weight:bold / 700 / 800 /900
   return /<(h[1-6]|strong|b|em|i|del|s|u|ins|ul|ol|li|pre|blockquote|table|a|code|img|hr|sup|sub)\b/i.test(html)
+    || /<span[^>]*style\s*=\s*["'][^"']*font-weight\s*:\s*(bold|[7-9]00)/i.test(html)
 }
+
 
 /** HTML → Markdown；入参可以是完整文档或片段 */
 export function htmlToMarkdown(html: string): string {
