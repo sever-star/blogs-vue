@@ -141,10 +141,16 @@
           <el-tag v-if="isAuthor" type="primary" size="small" effect="light">
             我的文章
           </el-tag>
-          <!-- 关注/私信：先只放按钮（看自己文章不展示），交互后续接入 -->
+          <!-- 关注/私信：看自己文章不展示；私信暂为占位 -->
           <div v-else class="author-actions">
-            <el-button size="small" type="primary" plain @click="handleFollow">
-              关注
+            <el-button
+              size="small"
+              :type="followed ? 'info' : 'primary'"
+              :plain="!followed"
+              :loading="followLoading"
+              @click="handleFollow"
+            >
+              {{ followed ? '已关注' : '关注' }}
             </el-button>
             <el-button size="small" plain @click="handleMessage">私信</el-button>
           </div>
@@ -183,6 +189,7 @@ import { MdPreview as MDPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
 import { Star, StarFilled, ChatDotRound, User, Calendar, View, Edit, Close, DocumentCopy } from '@element-plus/icons-vue'
 import CommentSection from '@/components/CommentSection.vue'
+import { getFollowStatus, followUser, unfollowUser } from '@/api/follow'
 
 const route = useRoute()
 const router = useRouter()
@@ -216,6 +223,8 @@ onMounted(async () => {
     if (articleStore.currentArticle) {
       document.title = articleStore.currentArticle.title
     }
+    // 登录且非作者本人时，拉一次关注状态决定按钮初始态（游客 / 自己文章不发请求，避免 401）
+    await loadFollowStatus()
   } catch (error) {
     ElMessage.error('加载文章失败')
     console.error('加载文章失败:', error)
@@ -285,9 +294,52 @@ function handleEdit() {
   router.push(`/write/${articleId.value}`)
 }
 
-// 关注/私信：先占位，后续接关注关系与私信会话
-function handleFollow() {
-  ElMessage.info('关注功能开发中，敬请期待')
+// ---- 关注作者 ----
+// 当前用户是否已关注文章作者；仅登录且非作者本人时会查询/生效
+const followed = ref(false)
+const followLoading = ref(false)
+
+/** 作者用户 ID（被关注对象） */
+function authorId(): number | null {
+  return articleStore.currentArticle?.userId ?? null
+}
+
+/** 详情页仅对「登录 + 非作者本人」拉关注状态；游客/作者本人保持默认未关注 */
+async function loadFollowStatus() {
+  const id = authorId()
+  if (!authStore.isLoggedIn || id == null || isAuthor.value) return
+  try {
+    followed.value = await getFollowStatus(id)
+  } catch {
+    // 状态查询失败不打扰用户，按钮保持默认「关注」
+    followed.value = false
+  }
+}
+
+async function handleFollow() {
+  const id = authorId()
+  if (id == null) return
+  if (!authStore.isLoggedIn) {
+    authStore.openLoginModal('login')
+    return
+  }
+  if (isAuthor.value) return // 看自己文章不展示按钮，双保险
+  followLoading.value = true
+  try {
+    if (followed.value) {
+      await unfollowUser(id)
+      followed.value = false
+      ElMessage.success('已取消关注')
+    } else {
+      await followUser(id)
+      followed.value = true
+      ElMessage.success('已关注')
+    }
+  } catch (error) {
+    ElMessage.error(errorText(error, followed.value ? '取消关注失败' : '关注失败'))
+  } finally {
+    followLoading.value = false
+  }
 }
 
 function handleMessage() {

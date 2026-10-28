@@ -51,7 +51,25 @@
               <el-empty description="收藏的文章会展示在这里" />
             </el-tab-pane>
             <el-tab-pane label="关注的用户" name="following">
-              <el-empty description="关注的用户会展示在这里" />
+              <div v-if="followingLoading" class="tab-skeleton">
+                <el-skeleton :rows="4" animated />
+              </div>
+              <el-empty v-else-if="followingError" :description="followingError">
+                <el-button type="primary" @click="loadFollowing">重试</el-button>
+              </el-empty>
+              <el-empty v-else-if="followingUsers.length === 0" description="还没有关注的用户" />
+              <div v-else class="following-list">
+                <div v-for="u in followingUsers" :key="u.id" class="following-row">
+                  <el-avatar :src="u.avatar || undefined" :size="44">
+                    {{ (u.nickname || u.username || '?').charAt(0) }}
+                  </el-avatar>
+                  <div class="following-info">
+                    <span class="following-nickname">{{ u.nickname || u.username }}</span>
+                    <span class="following-username">@{{ u.username }}</span>
+                    <span v-if="u.bio" class="following-bio">{{ u.bio }}</span>
+                  </div>
+                </div>
+              </div>
             </el-tab-pane>
           </el-tabs>
         </el-card>
@@ -67,7 +85,8 @@ import { storeToRefs } from 'pinia'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { getLikedArticles } from '@/api/article'
-import type { ArticleListItem } from '@/types'
+import { getFollowing } from '@/api/follow'
+import type { ArticleListItem, User } from '@/types'
 import ArticleCard from '@/components/ArticleCard.vue'
 
 const router = useRouter()
@@ -97,10 +116,33 @@ async function loadLiked() {
   }
 }
 
-/** 切换到「赞过的文章」时懒加载（仅首次）；其余两栏接口待实现 */
+/** 切换到「赞过的文章」时懒加载（仅首次）；「收藏的文章」接口待实现 */
 function onTabChange(name: string | number) {
   if (name === 'liked' && !likedLoaded.value && !likedLoading.value) {
     loadLiked()
+  }
+  if (name === 'following' && !followingLoaded.value && !followingLoading.value) {
+    loadFollowing()
+  }
+}
+
+// ---- 关注的用户 ----
+const followingUsers = ref<User[]>([])
+const followingLoading = ref(false)
+const followingError = ref('')
+const followingLoaded = ref(false)
+
+async function loadFollowing() {
+  followingLoading.value = true
+  followingError.value = ''
+  try {
+    followingUsers.value = await getFollowing()
+    followingLoaded.value = true
+  } catch (e: any) {
+    followingError.value = e?.message || '加载失败，请稍后重试'
+    ElMessage.error(followingError.value)
+  } finally {
+    followingLoading.value = false
   }
 }
 
@@ -210,6 +252,51 @@ onMounted(() => {
 
 .tab-skeleton {
   padding: 20px 8px;
+}
+
+/* 关注的用户列表 */
+.following-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.following-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 4px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.following-row:last-child {
+  border-bottom: none;
+}
+
+.following-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.following-nickname {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.following-username {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.following-bio {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 768px) {

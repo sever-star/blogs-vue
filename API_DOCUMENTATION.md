@@ -2018,9 +2018,13 @@ Content-Type: application/json
 
 ## 关注关系接口
 
-> ⚠️ **待实现（接口设计先行，2026-10-27）**：后端与 `blog_follows` 表均未落地（DDL 见「数据库表结构 · 十、关注关系」）。
-> 落地后接入两处前端：**文章详情页作者卡片「关注」按钮**、**我的主页「关注的用户」选择栏**。
+> ✅ **已实现（2026-10-28）**：后端 `BlogFollowsController`（`/api/follows`）+ `blog_follows` 表已落地；
+> 前端已接入文章详情页作者卡片「关注」按钮（`src/api/follow.ts` + `ArticleDetail.vue`）
+> 与我的主页「关注的用户」选择栏（`Profile.vue`）。
 > 路径前缀 `/api/follows`；操作对象恒为**当前登录用户**，不与 `/api/users`（管理员）规则冲突。
+>
+> ⚠️ **返回字段说明**：后端 `followed` 当前返回**字符串** `"true"` / `"false"`（非 JSON 布尔），
+> 前端 `src/api/follow.ts` 的 `toFlag()` 已统一归一化为 `boolean`，调用方按布尔处理即可。
 
 ### 1. 关注用户
 
@@ -2043,7 +2047,7 @@ Authorization: Bearer {accessToken}
 {
   "code": 200,
   "message": "操作成功",
-  "data": { "followed": true }
+  "data": { "followed": "true" }
 }
 ```
 
@@ -2075,7 +2079,7 @@ Authorization: Bearer {accessToken}
 {
   "code": 200,
   "message": "操作成功",
-  "data": { "followed": false }
+  "data": { "followed": "false" }
 }
 ```
 
@@ -2104,7 +2108,7 @@ Authorization: Bearer {accessToken}
 {
   "code": 200,
   "message": "操作成功",
-  "data": { "followed": true }
+  "data": { "followed": "true" }
 }
 ```
 
@@ -2163,8 +2167,8 @@ Authorization: Bearer {accessToken}
 
 | 位置 | 接口 | 交互 |
 |---|---|---|
-| 详情页作者卡片「关注」按钮 | `GET /follows/{userId}/status` 初始化；点击 `POST`/`DELETE` 切换 | 未登录点击 → 弹登录框；成功后按钮在「关注 ↔ 已关注」间切换；看自己文章不展示按钮（现状） |
-| 我的主页「关注的用户」选择栏 | `GET /follows/mine` | 头像 + 昵称 + `@用户名` 行展示；暂无用户级主页，行不可跳转 |
+| 详情页作者卡片「关注」按钮 ✅ | `GET /follows/{userId}/status` 初始化；点击 `POST`/`DELETE` 切换 | 未登录点击 → 弹登录框；成功后按钮在「关注 ↔ 已关注」间切换；看自己文章不展示按钮 |
+| 我的主页「关注的用户」选择栏 ✅ | `GET /follows/mine` | 头像 + 昵称 + `@用户名` + 简介行展示；暂无用户级主页，行不可跳转 |
 | 我的主页「赞过的文章」 | `GET /posts/liked` | 复用 `ArticleCard` 渲染，点击进文章详情 |
 | 我的主页「收藏的文章」 | `GET /posts/favorited` | 同上 |
 
