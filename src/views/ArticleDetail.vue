@@ -180,7 +180,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useArticleStore } from '@/stores/article'
 import { useAuthStore } from '@/stores/auth'
@@ -223,6 +223,9 @@ onMounted(async () => {
     if (articleStore.currentArticle) {
       document.title = articleStore.currentArticle.title
     }
+    // 详情页是公开路由，守卫不会等 ensureReady；这里显式等用户态恢复完成，
+    // 否则新标签页打开时 user 尚未拉回、isLoggedIn 为 false，关注状态会被跳过
+    await authStore.ensureReady()
     // 登录且非作者本人时，拉一次关注状态决定按钮初始态（游客 / 自己文章不发请求，避免 401）
     await loadFollowStatus()
   } catch (error) {
@@ -230,6 +233,16 @@ onMounted(async () => {
     console.error('加载文章失败:', error)
   }
 })
+
+// 在详情页登录（弹窗登录）后，登录态由 false→true，补拉一次关注状态
+watch(
+  () => authStore.isLoggedIn,
+  (loggedIn: boolean) => {
+    if (loggedIn && articleStore.currentArticle) {
+      loadFollowStatus()
+    }
+  }
+)
 
 onUnmounted(() => {
   document.title = previousTitle
