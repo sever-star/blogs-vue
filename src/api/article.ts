@@ -46,6 +46,15 @@ export const getMyArticles = async (): Promise<ArticleListItem[]> => {
 }
 
 /**
+ * 我赞过的文章（当前用户的点赞记录，按点赞时间倒序）
+ * 只含已发布且未软删；结构同 GET /posts 列表项；全量返回，前端自行分页
+ * GET /posts/liked
+ */
+export const getLikedArticles = async (): Promise<ArticleListItem[]> => {
+  return client.get('/posts/liked')
+}
+
+/**
  * 获取单篇文章详情
  * GET /posts/{id}
  */

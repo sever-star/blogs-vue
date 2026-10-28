@@ -71,11 +71,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Article } from '@/stores/article'
+import { ArticleListItem } from '@/stores/article'
 import { Calendar, User, View, ChatDotRound } from '@element-plus/icons-vue'
 
+// 用 ArticleListItem 而非 Article：卡片只用到列表项字段（title/summary/coverImage/
+// viewCount/likeCount/commentCount/category/tags/authorNickname/createdAt），
+// 详情接口的 contentMd/contentHtml/liked/favorited 这里不需要，列表项也能直接渲染
 const props = defineProps<{
-  article: Article
+  article: ArticleListItem
 }>()
 
 defineEmits<{

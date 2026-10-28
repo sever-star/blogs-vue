@@ -874,8 +874,7 @@ Authorization: Bearer {accessToken}
 
 ### 9. 我赞过的文章列表
 
-> ⚠️ **待实现（接口设计先行，2026-10-27）**：后端尚未实现，`blog_post_likes` 表已存在。
-> 落地后接入我的主页「赞过的文章」选择栏。
+> ✅ **已实现（2026-10-28）**：后端 `GET /posts/liked`（`BlogPostController#getLikedPosts` → `BlogPostService#getLikePost` → `PostRepository.getLikePost`），前端接入我的主页「赞过的文章」选择栏，复用 `ArticleCard` 渲染。
 
 **请求**
 

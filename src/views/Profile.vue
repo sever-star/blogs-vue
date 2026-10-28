@@ -30,9 +30,22 @@
       <!-- 右侧：三个选择栏（赞过 / 收藏 / 关注） -->
       <main class="profile-main">
         <el-card shadow="never" class="profile-card">
-          <el-tabs v-model="activeTab">
+          <el-tabs v-model="activeTab" @tab-change="onTabChange">
             <el-tab-pane label="赞过的文章" name="liked">
-              <el-empty description="赞过的文章会展示在这里" />
+              <!-- 加载中 -->
+              <div v-if="likedLoading" class="tab-skeleton">
+                <el-skeleton :rows="5" animated />
+              </div>
+              <!-- 加载失败 -->
+              <el-empty v-else-if="likedError" :description="likedError">
+                <el-button type="primary" @click="loadLiked">重试</el-button>
+              </el-empty>
+              <!-- 空列表 -->
+              <el-empty v-else-if="likedArticles.length === 0" description="还没有赞过的文章" />
+              <!-- 文章列表：复用首页 ArticleCard，点击进详情 -->
+              <div v-else class="liked-list">
+                <ArticleCard v-for="a in likedArticles" :key="a.id" :article="a" />
+              </div>
             </el-tab-pane>
             <el-tab-pane label="收藏的文章" name="favorites">
               <el-empty description="收藏的文章会展示在这里" />
@@ -51,25 +64,58 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
+import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { getLikedArticles } from '@/api/article'
+import type { ArticleListItem } from '@/types'
+import ArticleCard from '@/components/ArticleCard.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const { user } = storeToRefs(authStore)
 
-// 三个选择栏：数据接口后续接入，先占位
+// 三个选择栏：收藏 / 关注 接口待后端实现，先占位
 const activeTab = ref<'liked' | 'favorites' | 'following'>('liked')
+
+// ---- 赞过的文章 ----
+const likedArticles = ref<ArticleListItem[]>([])
+const likedLoading = ref(false)
+const likedError = ref('')
+const likedLoaded = ref(false)
+
+async function loadLiked() {
+  likedLoading.value = true
+  likedError.value = ''
+  try {
+    likedArticles.value = await getLikedArticles()
+    likedLoaded.value = true
+  } catch (e: any) {
+    likedError.value = e?.message || '加载失败，请稍后重试'
+    ElMessage.error(likedError.value)
+  } finally {
+    likedLoading.value = false
+  }
+}
+
+/** 切换到「赞过的文章」时懒加载（仅首次）；其余两栏接口待实现 */
+function onTabChange(name: string | number) {
+  if (name === 'liked' && !likedLoaded.value && !likedLoading.value) {
+    loadLiked()
+  }
+}
 
 function formatDate(date?: string | null): string {
   if (!date) return '—'
   return new Date(date).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' })
 }
 
-// 未登录时不允许进入（路由守卫兜底）
+// 未登录时不允许进入（路由守卫兜底）；已登录则默认进「赞过的文章」直接拉取
 onMounted(() => {
   if (!authStore.isLoggedIn) {
     router.replace('/')
+    return
   }
+  loadLiked()
 })
 </script>
 
@@ -155,6 +201,15 @@ onMounted(() => {
   border-radius: 12px;
   border: none;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* 赞过的文章列表：ArticleCard 自带卡片间距与底色，外层只补内边距 */
+.liked-list {
+  padding: 4px 0 8px;
+}
+
+.tab-skeleton {
+  padding: 20px 8px;
 }
 
 @media (max-width: 768px) {
