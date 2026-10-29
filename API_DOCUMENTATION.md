@@ -3559,26 +3559,7 @@ CREATE TABLE blog_statistics (
 );
 ```
 
-### 八、用户设置
-
-#### blog_user_settings 表（用户个性化配置）
-
-```sql
-CREATE TABLE blog_user_settings (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  user_id INT NOT NULL COMMENT '唯一',
-  theme VARCHAR(20) DEFAULT 'default',
-  language VARCHAR(10) DEFAULT 'zh-CN',
-  comment_notify TINYINT(1) NOT NULL DEFAULT 1 COMMENT '评论回复通知',
-  like_notify TINYINT(1) NOT NULL DEFAULT 1 COMMENT '点赞通知',
-  email_notify TINYINT(1) NOT NULL DEFAULT 1 COMMENT '邮件通知',
-  updated_at DATETIME NOT NULL,
-  UNIQUE KEY uk_user (user_id)
-  -- 注意：无 created_at
-);
-```
-
-### 九、AI 对话
+### 八、AI 对话
 
 #### blog_ai_sessions 表（AI 会话窗口）
 
@@ -3631,7 +3612,7 @@ CREATE TABLE blog_ai_usage (
 
 ---
 
-### 十、关注关系（待实施）
+### 九、关注关系（待实施）
 
 #### blog_follows 表（用户关注关系）
 
