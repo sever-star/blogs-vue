@@ -3546,19 +3546,6 @@ CREATE TABLE blog_search_keywords (
 );
 ```
 
-#### blog_statistics 表（站点统计缓存）
-
-```sql
-CREATE TABLE blog_statistics (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  stat_key VARCHAR(50) NOT NULL COMMENT '如 total_posts/total_comments',
-  stat_value BIGINT UNSIGNED NOT NULL DEFAULT 0,
-  updated_at DATETIME NOT NULL,
-  UNIQUE KEY uk_stat_key (stat_key)
-  -- 注意：无 created_at
-);
-```
-
 ### 八、AI 对话
 
 #### blog_ai_sessions 表（AI 会话窗口）
