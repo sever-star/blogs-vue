@@ -187,8 +187,13 @@ const NOTIF_QUICK_ENTRIES: Array<{ tab: NotificationTab; label: string; icon: un
   { tab: 'system', label: '系统', icon: InfoFilled },
 ]
 
-/** 跳转通知页（点铃铛本体默认进第一个分类「评论通知」，点快捷入口进对应模块） */
+/** 跳转通知页（点铃铛本体默认进第一个分类「评论通知」，点快捷入口进对应模块）
+ *  例外：私信是独立页，私信快捷入口跳 /messages 而非通知页 */
 function goNotifications(tab: NotificationTab = 'comment') {
+  if (tab === 'message') {
+    router.push('/messages')
+    return
+  }
   router.push({ name: 'Notifications', query: { tab } })
 }
 

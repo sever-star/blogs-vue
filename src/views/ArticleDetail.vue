@@ -356,7 +356,14 @@ async function handleFollow() {
 }
 
 function handleMessage() {
-  ElMessage.info('私信功能开发中，敬请期待')
+  if (!authStore.isLoggedIn) {
+    authStore.openLoginModal('login')
+    return
+  }
+  const id = authorId()
+  if (id == null) return
+  if (isAuthor.value) return // 看自己文章不展示私信入口，双保险
+  router.push({ path: '/messages', query: { userId: id } })
 }
 
 /** 下架文章（作者/管理员）：确认后调接口，store 同步 currentArticle.status，按钮随 canOffline 自动消失 */

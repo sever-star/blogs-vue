@@ -52,6 +52,14 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   },
   {
+    // 私信（从铃铛「私信」入口 / 文章详情「私信」按钮 / 私信通知 link 进入）
+    // 带 ?userId={peerId} 时自动获取或创建与该用户的会话
+    path: '/messages',
+    name: 'Messages',
+    component: () => import('@/views/Messages.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/article/:id',
     name: 'ArticleDetail',
     component: () => import('@/views/ArticleDetail.vue'),
