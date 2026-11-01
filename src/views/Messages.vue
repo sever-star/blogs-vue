@@ -27,6 +27,16 @@
                 <span v-if="c.unreadCount > 0" class="conv-badge">{{ c.unreadCount }}</span>
               </div>
             </div>
+            <el-button
+              class="conv-delete"
+              link
+              type="danger"
+              size="small"
+              title="删除会话"
+              @click.stop="handleDelete(c)"
+            >
+              <el-icon><Delete /></el-icon>
+            </el-button>
           </div>
           <el-empty
             v-if="!loadingConv && conversations.length === 0"
@@ -97,7 +107,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Delete } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
 import {
@@ -106,6 +117,7 @@ import {
   getConversationMessages,
   sendMessage,
   markConversationRead,
+  deleteConversation,
   type Conversation,
   type ChatMessage,
 } from '@/api/message'
@@ -221,6 +233,32 @@ async function handleSend() {
     ElMessage.error((e as { message?: string })?.message || '发送失败')
   } finally {
     sending.value = false
+  }
+}
+
+async function handleDelete(conv: Conversation) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除与「${conv.peerUser.nickname}」的会话吗？仅对你隐藏，对方不受影响；对方再发消息时会重新出现。`,
+      '删除会话',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  try {
+    await deleteConversation(conv.id)
+    conversations.value = conversations.value.filter((c: Conversation) => c.id !== conv.id)
+    if (activeConversation.value?.id === conv.id) {
+      activeConversation.value = null
+      messages.value = []
+      if (conversations.value.length > 0) {
+        await selectConversation(conversations.value[0])
+      }
+    }
+    ElMessage.success('已删除')
+  } catch (e: unknown) {
+    ElMessage.error((e as { message?: string })?.message || '删除失败')
   }
 }
 
@@ -370,6 +408,17 @@ function formatConvTime(time: string | null): string {
   color: #fff;
   background: #f56c6c;
   border-radius: 999px;
+}
+
+/* 删除按钮：默认隐藏，hover 会话项时出现，不挤占布局 */
+.conv-delete {
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.conv-item:hover .conv-delete {
+  opacity: 1;
 }
 
 /* ---- 右栏消息窗 ---- */

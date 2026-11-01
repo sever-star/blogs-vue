@@ -112,7 +112,7 @@ export const markConversationRead = async (conversationId: number): Promise<numb
 /**
  * 删除会话（对自己隐藏）（接口 6）
  * DELETE /messages/conversations/{conversationId}
- * TODO: 后端未实现。
+ * 幂等：后端单条 UPDATE 置当前用户侧 hidden=1，重复调用结果一致；不影响对方。
  */
 export const deleteConversation = async (conversationId: number): Promise<void> => {
   await client.delete(`/messages/conversations/${conversationId}`)
@@ -121,7 +121,7 @@ export const deleteConversation = async (conversationId: number): Promise<void> 
 /**
  * 全局未读私信数（接口 7）
  * GET /messages/unread-count
- * TODO: 后端未实现；Header 铃铛私信角标暂沿用 notifStore.byType.message。
+ * 当前用户参与的所有会话 a/b_unread_count 之和。
  */
 export const getUnreadMessageCount = async (): Promise<number> => {
   const data = (await client.get('/messages/unread-count')) as { count?: number } | null
