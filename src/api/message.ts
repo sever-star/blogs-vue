@@ -101,10 +101,12 @@ export const sendMessage = async (payload: SendMessagePayload): Promise<ChatMess
 /**
  * 标记会话已读（接口 5）
  * PUT /messages/conversations/{conversationId}/read
- * TODO: 后端未实现，暂不调用——选中会话时未读角标不会清零。
+ * 后端返回 { unreadCount }（标记后该会话剩余未读数，通常为 0），
+ * 并联动把该会话相关的 type='message' 通知副本标已读。
  */
-export const markConversationRead = async (conversationId: number): Promise<void> => {
-  await client.put(`/messages/conversations/${conversationId}/read`)
+export const markConversationRead = async (conversationId: number): Promise<number> => {
+  const data = (await client.put(`/messages/conversations/${conversationId}/read`)) as { unreadCount?: number } | null
+  return data?.unreadCount ?? 0
 }
 
 /**

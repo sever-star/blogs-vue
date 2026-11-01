@@ -99,17 +99,20 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationStore } from '@/stores/notification'
 import {
   getConversations,
   getOrCreateConversation,
   getConversationMessages,
   sendMessage,
+  markConversationRead,
   type Conversation,
   type ChatMessage,
 } from '@/api/message'
 
 const route = useRoute()
 const authStore = useAuthStore()
+const notifStore = useNotificationStore()
 const currentUserId = computed(() => authStore.user?.id)
 
 const conversations = ref<Conversation[]>([])
@@ -170,9 +173,16 @@ async function selectConversation(conv: Conversation) {
   if (activeConversation.value?.id === conv.id) return
   activeConversation.value = conv
   await loadMessages(conv.id)
-  // TODO: 后端 PUT /messages/conversations/{id}/read 未实现，
-  //       选中会话暂不能清零未读角标，待后端补齐后在此调用 markConversationRead(conv.id)
-  //       并本地把 conv.unreadCount 置 0。
+  // 有未读才标记，避免无意义请求；乐观清零角标，后端联动把 type=message 通知标已读后刷新铃铛
+  if (conv.unreadCount > 0) {
+    conv.unreadCount = 0
+    try {
+      await markConversationRead(conv.id)
+      await notifStore.fetchUnreadCount()
+    } catch {
+      // 标记失败不影响查看消息，下次进入会话会重新拉取未读数
+    }
+  }
 }
 
 async function loadMessages(conversationId: number) {
