@@ -64,16 +64,16 @@
             <div class="notif-quick-menu">
               <div
                 v-for="entry in NOTIF_QUICK_ENTRIES"
-                :key="entry.tab"
+                :key="entry.key"
                 class="notif-quick-item"
-                @click="goNotifications(entry.tab)"
+                @click="goNotifications(entry.key)"
               >
                 <el-icon><component :is="entry.icon" /></el-icon>
                 <span>{{ entry.label }}</span>
                 <span
-                  v-if="notifStore.unreadByTab[entry.tab] > 0"
+                  v-if="entry.key !== 'message' && notifStore.unreadByTab[entry.key] > 0"
                   class="quick-badge"
-                >{{ notifStore.unreadByTab[entry.tab] }}</span>
+                >{{ notifStore.unreadByTab[entry.key] }}</span>
                 <el-icon class="quick-arrow"><ArrowRight /></el-icon>
               </div>
             </div>
@@ -155,7 +155,6 @@ import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
-import type { NotificationTab } from '@/stores/notification'
 import { ElMessage } from 'element-plus'
 import {
   ArrowDown,
@@ -178,23 +177,23 @@ const { isLoggedIn, isAdmin, user, showLoginModal } = storeToRefs(authStore)
 
 // ---- 站内通知铃铛 ----
 
-/** 悬浮弹层的五个分类快捷入口 */
-const NOTIF_QUICK_ENTRIES: Array<{ tab: NotificationTab; label: string; icon: unknown }> = [
-  { tab: 'comment', label: '评论通知', icon: ChatDotRound },
-  { tab: 'like', label: '点赞收藏', icon: Star },
-  { tab: 'follow', label: '关注', icon: User },
-  { tab: 'message', label: '私信', icon: Message },
-  { tab: 'system', label: '系统', icon: InfoFilled },
+/** 悬浮弹层的分类快捷入口：评论/点赞收藏/关注/系统走通知页，私信走私信页（无私信角标） */
+const NOTIF_QUICK_ENTRIES: Array<{ key: string; label: string; icon: unknown }> = [
+  { key: 'comment', label: '评论通知', icon: ChatDotRound },
+  { key: 'like', label: '点赞收藏', icon: Star },
+  { key: 'follow', label: '关注', icon: User },
+  { key: 'message', label: '私信', icon: Message },
+  { key: 'system', label: '系统', icon: InfoFilled },
 ]
 
-/** 跳转通知页（点铃铛本体默认进第一个分类「评论通知」，点快捷入口进对应模块）
- *  例外：私信是独立页，私信快捷入口跳 /messages 而非通知页 */
-function goNotifications(tab: NotificationTab = 'comment') {
-  if (tab === 'message') {
+/** 点铃铛本体默认进第一个分类「评论通知」；点快捷入口进对应模块。
+ *  私信是独立页，私信入口跳 /messages 而非通知页 */
+function goNotifications(key: string = 'comment') {
+  if (key === 'message') {
     router.push('/messages')
     return
   }
-  router.push({ name: 'Notifications', query: { tab } })
+  router.push({ name: 'Notifications', query: { tab: key } })
 }
 
 // 进入页面拉一次未读数（登录态恢复后）；登出时清空

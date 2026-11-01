@@ -14,15 +14,14 @@ export const NOTIFICATION_TABS = [
   { key: 'comment', label: '评论通知' },
   { key: 'like', label: '点赞收藏' },
   { key: 'follow', label: '关注' },
-  { key: 'message', label: '私信' },
   { key: 'system', label: '系统' },
 ] as const
 
 export type NotificationTab = (typeof NOTIFICATION_TABS)[number]['key']
 
 /** 各 tab 未读计数初始空表 */
-function emptyTabs(): Record<NotificationTab, number> {
-  return { comment: 0, like: 0, follow: 0, message: 0, system: 0 }
+function emptyTabs(): Record<string, number> {
+  return { comment: 0, like: 0, follow: 0, system: 0 }
 }
 
 /** 某条通知（按原始 type）归到哪个 tab */
@@ -38,7 +37,8 @@ function tabOf(type: NotificationType): NotificationTab {
     case 'follow':
       return 'follow'
     case 'message':
-      return 'message'
+      // 私信通知已下线，旧数据归到系统 tab 展示
+      return 'system'
     default:
       return 'system'
   }
@@ -48,7 +48,7 @@ export const useNotificationStore = defineStore('notification', () => {
   const list = ref<Notification[]>([])
   const unreadCount = ref(0)
   /** 各分类的未读数（按 tab 聚合，由后端 byType 派生） */
-  const unreadByTab = ref<Record<NotificationTab, number>>(emptyTabs())
+  const unreadByTab = ref<Record<string, number>>(emptyTabs())
   const loading = ref(false)
   const activeTab = ref<NotificationTab>('comment')
   const total = ref(0)
@@ -57,11 +57,13 @@ export const useNotificationStore = defineStore('notification', () => {
   const fetchUnreadCount = async () => {
     try {
       const res = await getUnreadCount()
-      unreadCount.value = Number(res?.count ?? 0)
-      // 后端返回 byType（原始 type → 未读数），前端按 tabOf 聚合成 5 个 tab
-      const next = emptyTabs()
       const byType = res?.byType ?? {}
+      // 私信未读不进通知系统：铃铛总数与各 tab 角标都排除 message 类型
+      const messageUnread = Number(byType['message']) || 0
+      unreadCount.value = Math.max(0, Number(res?.count ?? 0) - messageUnread)
+      const next = emptyTabs()
       for (const [type, n] of Object.entries(byType)) {
+        if (type === 'message') continue
         next[tabOf(type as NotificationType)] += Number(n) || 0
       }
       unreadByTab.value = next
