@@ -71,9 +71,11 @@
                 <el-icon><component :is="entry.icon" /></el-icon>
                 <span>{{ entry.label }}</span>
                 <span
-                  v-if="entry.key !== 'message' && notifStore.unreadByTab[entry.key] > 0"
+                  v-if="entry.key === 'message'
+                    ? notifStore.messageUnreadCount > 0
+                    : notifStore.unreadByTab[entry.key] > 0"
                   class="quick-badge"
-                >{{ notifStore.unreadByTab[entry.key] }}</span>
+                >{{ entry.key === 'message' ? notifStore.messageUnreadCount : notifStore.unreadByTab[entry.key] }}</span>
                 <el-icon class="quick-arrow"><ArrowRight /></el-icon>
               </div>
             </div>
@@ -177,7 +179,8 @@ const { isLoggedIn, isAdmin, user, showLoginModal } = storeToRefs(authStore)
 
 // ---- 站内通知铃铛 ----
 
-/** 悬浮弹层的分类快捷入口：评论/点赞收藏/关注/系统走通知页，私信走私信页（无私信角标） */
+/** 悬浮弹层的分类快捷入口：评论/点赞收藏/关注/系统走通知页，私信走私信页
+ *  私信未读数来自独立的 /messages/unread-count 接口（notifStore.messageUnreadCount） */
 const NOTIF_QUICK_ENTRIES: Array<{ key: string; label: string; icon: unknown }> = [
   { key: 'comment', label: '评论通知', icon: ChatDotRound },
   { key: 'like', label: '点赞收藏', icon: Star },
@@ -196,15 +199,21 @@ function goNotifications(key: string = 'comment') {
   router.push({ name: 'Notifications', query: { tab: key } })
 }
 
-// 进入页面拉一次未读数（登录态恢复后）；登出时清空
+// 进入页面拉一次未读数（通知 + 私信，登录态恢复后）；登出时清空
 onMounted(async () => {
   if (isLoggedIn.value) {
-    await notifStore.fetchUnreadCount()
+    await Promise.all([
+      notifStore.fetchUnreadCount(),
+      notifStore.fetchMessageUnread(),
+    ])
   }
 })
 watch(isLoggedIn, async (val: boolean) => {
   if (val) {
-    await notifStore.fetchUnreadCount()
+    await Promise.all([
+      notifStore.fetchUnreadCount(),
+      notifStore.fetchMessageUnread(),
+    ])
   } else {
     notifStore.clear()
   }

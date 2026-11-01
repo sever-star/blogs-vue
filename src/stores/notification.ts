@@ -8,6 +8,7 @@ import {
   markAllNotificationsRead,
   deleteNotification,
 } from '@/api/notification'
+import { getUnreadMessageCount } from '@/api/message'
 
 /** 通知页的分类模块（无「全部」：铃铛本体默认进第一个分类 comment） */
 export const NOTIFICATION_TABS = [
@@ -52,6 +53,8 @@ export const useNotificationStore = defineStore('notification', () => {
   const loading = ref(false)
   const activeTab = ref<NotificationTab>('comment')
   const total = ref(0)
+  /** 当前用户私信总未读数（独立于通知系统，来自 GET /messages/unread-count） */
+  const messageUnreadCount = ref(0)
 
   /** 进入页面 / 点开铃铛时拉一次未读数（不轮询） */
   const fetchUnreadCount = async () => {
@@ -70,6 +73,15 @@ export const useNotificationStore = defineStore('notification', () => {
     } catch {
       unreadCount.value = 0
       unreadByTab.value = emptyTabs()
+    }
+  }
+
+  /** 拉私信总未读数（私信未读不进通知系统，单独接口；供铃铛「私信」入口角标展示） */
+  const fetchMessageUnread = async () => {
+    try {
+      messageUnreadCount.value = await getUnreadMessageCount()
+    } catch {
+      messageUnreadCount.value = 0
     }
   }
 
@@ -143,6 +155,7 @@ export const useNotificationStore = defineStore('notification', () => {
     unreadCount.value = 0
     unreadByTab.value = emptyTabs()
     activeTab.value = 'comment'
+    messageUnreadCount.value = 0
   }
 
   return {
@@ -152,7 +165,9 @@ export const useNotificationStore = defineStore('notification', () => {
     loading,
     activeTab,
     total,
+    messageUnreadCount,
     fetchUnreadCount,
+    fetchMessageUnread,
     fetchList,
     visibleList,
     markRead,

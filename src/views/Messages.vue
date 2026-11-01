@@ -191,6 +191,7 @@ async function selectConversation(conv: Conversation) {
     try {
       await markConversationRead(conv.id)
       await notifStore.fetchUnreadCount()
+      await notifStore.fetchMessageUnread()
     } catch {
       // 标记失败不影响查看消息，下次进入会话会重新拉取未读数
     }
@@ -257,6 +258,7 @@ async function handleDelete(conv: Conversation) {
       }
     }
     ElMessage.success('已删除')
+    await notifStore.fetchMessageUnread()
   } catch (e: unknown) {
     ElMessage.error((e as { message?: string })?.message || '删除失败')
   }

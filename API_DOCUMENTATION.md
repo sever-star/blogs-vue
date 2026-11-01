@@ -3681,8 +3681,403 @@ CREATE INDEX IF NOT EXISTS idx_messages_recv_unread ON blog_messages(receiver_id
 - **冗余计数加速列表**：`a/b_unread_count` 冗余存储未读数，发送时给对方 +1、标记已读时归零（与 `blog_posts.like_count/fav_count` 同思路）；`last_message_id`/`last_message_at` 冗余最后一条消息，避免会话列表每次 join 消息表
 - **删除只对自己隐藏**：`a/b_hidden` 置 1 后会话列表不再返回该会话，不影响对方；对方再发新消息时自动 `unhidden`。物理删除走 `ON DELETE CASCADE`（用户注销/会话删除时消息随之清理，已测）
 - **`last_message_id` 不设外键**：因 `blog_messages.conversation_id` 已外键到会话表，双向外键会成循环引用；该列作纯冗余由应用层维护
-- **未读数以消息表为权威源**：`SUM` 当前用户侧 `*_unread_count` 即 `GET /messages/unread-count`；与通知 `type='message'` 物化副本双向同步（发消息物化一条通知、会话已读时把对应通知标已读），避免双数据源漂移
+- **未读数以会话侧冗余计数为唯一权威源**：`SUM` 当前用户侧 `*_unread_count` 即 `GET /messages/unread-count`；私信未读已从通知系统下线（不再物化 `type='message'` 通知副本），铃铛「私信」角标与会话列表角标均取自该接口，单数据源无漂移
 - 触发器 `trg_conversations_updated_at` 自动维护 `updated_at`（jOOQ 应用层亦会维护，此处兜底）；`blog_messages` 无需 `updated_at`（消息不可变，仅 `created_at`）
+
+### 十、私信
+
+#### 十、私信接口
+
+> **状态**：表已建好（`blog_conversations` + `blog_messages`），**后端接口待实现**。
+> 路径前缀 `/api/messages`；操作对象恒为**当前登录用户**，全部需认证（`Authorization: Bearer {accessToken}`）。
+> 与站内通知联动：发消息时给接收方生成 `type='message'` 的通知副本；会话整体会话已读时把对应通知副本标已读。
+
+---
+
+#### 1. 我的会话列表
+
+**请求**
+
+```
+GET /messages/conversations?page=1&pageSize=20
+Authorization: Bearer {accessToken}
+```
+
+**Query 参数**
+
+| 参数 | 类型 | 必需 | 默认值 | 说明 |
+|------|------|:----:|--------|------|
+| page | number | 否 | 1 | 页码，从 1 开始 |
+| pageSize | number | 否 | 20 | 每页条数 |
+
+**返回**（`PageResult` 结构）
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "data": [
+      {
+        "id": 15,
+        "peerUser": {
+          "id": 7,
+          "username": "author",
+          "nickname": "作者昵称",
+          "avatar": "https://…/avatar.png"
+        },
+        "lastMessagePreview": "好的，明天见！",
+        "lastMessageAt": "2026-10-29T14:30:00",
+        "unreadCount": 3,
+        "createdAt": "2026-10-28T10:00:00",
+        "updatedAt": "2026-10-29T14:30:00"
+      }
+    ],
+    "total": 5,
+    "page": 1,
+    "pageSize": 20,
+    "totalPages": 1
+  }
+}
+```
+
+**字段说明**
+
+| 字段 | 说明 |
+|------|------|
+| `id` | 会话 ID |
+| `peerUser` | 对方用户信息（`id`/`username`/`nickname`/`avatar`），**不含邮箱等敏感字段** |
+| `lastMessagePreview` | 最后一条消息正文（超过 50 字符截断并加 `…`） |
+| `lastMessageAt` | 最后一条消息时间（按此字段倒序排列） |
+| `unreadCount` | 当前用户在该会话的未读消息数（`a/b_unread_count` 按身份映射） |
+
+**错误情况**
+
+- 401: 未登录
+
+**备注**
+
+- 需要认证；只返回**当前登录用户**参与、且未隐藏（`a/b_hidden=0`）的会话
+- 按 `lastMessage_at` 倒序（最近活跃会话在前）
+- 会话列表不返回消息内容列表，消息详情走接口 3
+
+---
+
+#### 2. 获取或创建与某用户的会话
+
+> 用于「发起私信」入口（如点击用户头像旁的「私信」按钮）：若已有会话则返回，无则新建空会话。
+
+**请求**
+
+```
+GET /messages/conversations/with/{userId}
+Authorization: Bearer {accessToken}
+```
+
+**URL 参数**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| userId | number | 对方用户 ID |
+
+**返回**（结构同接口 1 的单条会话对象；新建时 `lastMessagePreview`/`lastMessageAt` 为 `null`）
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "id": 15,
+    "peerUser": {
+      "id": 7,
+      "username": "author",
+      "nickname": "作者昵称",
+      "avatar": "https://…/avatar.png"
+    },
+    "lastMessagePreview": null,
+    "lastMessageAt": null,
+    "unreadCount": 0,
+    "createdAt": "2026-10-29T15:00:00",
+    "updatedAt": "2026-10-29T15:00:00"
+  }
+}
+```
+
+**错误情况**
+
+- 401: 未登录
+- 400: 不能与自己会话（`userId` 等于当前用户）
+- 404: 用户不存在
+
+**备注**
+
+- **幂等**：已存在会话（含对方已隐藏后重新出现）则返回既有会话，不重复创建
+- 若会话曾被对方隐藏（`peer` 侧 `hidden=1`），再次发起时后端应将对方的 `hidden` 标志重置为 0（对方重新看到会话）
+- 新建会话时 `user_a_id`/`user_b_id` 由后端按 `min(userId)`/`max(userId)` 排序写入，满足 `ck_conversations_order` 约束
+
+---
+
+#### 3. 获取会话中的消息列表
+
+**请求**
+
+```
+GET /messages/conversations/{conversationId}/messages?page=1&pageSize=20
+Authorization: Bearer {accessToken}
+```
+
+**URL 参数**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| conversationId | number | 会话 ID |
+
+**Query 参数**
+
+| 参数 | 类型 | 必需 | 默认值 | 说明 |
+|------|------|:----:|--------|------|
+| page | number | 否 | 1 | 页码，从 1 开始 |
+| pageSize | number | 否 | 20 | 每页条数 |
+
+**返回**（`PageResult` 结构；消息按 `createdAt` **倒序**返回，最新在前）
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "data": [
+      {
+        "id": 100,
+        "conversationId": 15,
+        "senderId": 7,
+        "receiverId": 3,
+        "senderNickname": "作者昵称",
+        "senderAvatar": "https://…/avatar.png",
+        "content": "好的，明天见！",
+        "isRead": 1,
+        "readAt": "2026-10-29T14:31:00",
+        "createdAt": "2026-10-29T14:30:00"
+      }
+    ],
+    "total": 42,
+    "page": 1,
+    "pageSize": 20,
+    "totalPages": 3
+  }
+}
+```
+
+**错误情况**
+
+- 401: 未登录
+- 403: 非会话参与者（不是会话任一方）
+- 404: 会话不存在
+
+**备注**
+
+- 需要认证；**仅会话双方可读**（后端校验 `sender_id` 或 `receiver_id` 包含当前用户）
+- 消息不可编辑、不可删除（消息不可变，仅 `created_at`）
+- `isRead`：`0`=未读，`1`=已读；`readAt` 为接收方读取时间
+
+---
+
+#### 4. 发送私信
+
+**请求**
+
+```
+POST /messages
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+**入参**
+
+```json
+{
+  "receiverId": 7,
+  "content": "string (1-2000 字符，必填)"
+}
+```
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|:----:|------|
+| receiverId | number | 是 | 接收方用户 ID |
+| content | string | 是 | 消息正文，1-2000 字符，不能为空白 |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "id": 100,
+    "conversationId": 15,
+    "senderId": 3,
+    "receiverId": 7,
+    "senderNickname": "我的昵称",
+    "senderAvatar": "https://…/my-avatar.png",
+    "content": "你好，想请教一个问题",
+    "isRead": 0,
+    "readAt": null,
+    "createdAt": "2026-10-29T15:00:00"
+  }
+}
+```
+
+**错误情况**
+
+- 401: 未登录
+- 400: 不能给自己发私信 / 内容为空或超长
+- 404: 接收方用户不存在
+
+**备注**
+
+- 需要认证
+- 后端自动：查找或创建会话（`user_a_id`/`user_b_id` 按序）→ 插入 `blog_messages` → 更新会话 `last_message_id`/`last_message_at`、接收方 `*_unread_count` +1 → 将接收方 `*_hidden` 标志重置为 0（对方重新看到会话）
+- **不再生成 `type='message'` 通知**：私信未读已从通知系统下线，发送私信只更新会话侧 `*_unread_count`，不向 `blog_notifications` 物化副本；未读数以 `GET /messages/unread-count` 为唯一权威源
+- 同一事务内完成会话更新 + 消息插入
+
+---
+
+#### 5. 标记会话已读
+
+> 将会话中**发给当前用户**的未读消息标记为已读，并清零会话侧 `*_unread_count`。
+
+**请求**
+
+```
+PUT /messages/conversations/{conversationId}/read
+Authorization: Bearer {accessToken}
+```
+
+**URL 参数**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| conversationId | number | 会话 ID |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "unreadCount": 0
+  }
+}
+```
+
+**错误情况**
+
+- 401: 未登录
+- 403: 非会话参与者
+- 404: 会话不存在
+
+**备注**
+
+- 需要认证；**幂等**：重复调用仍返回 200，`unreadCount` 恒为 0
+- 后端执行：
+  1. `UPDATE blog_messages SET is_read=1, read_at=now() WHERE conversation_id=? AND receiver_id=? AND is_read=0`
+  2. 将当前用户侧 `*_unread_count` 归零
+- 返回操作后当前用户的未读数（恒为 0，供前端即时更新角标）；前端随后刷新 `GET /messages/unread-count` 同步 Header 铃铛「私信」角标
+
+---
+
+#### 6. 删除会话（对自己隐藏）
+
+**请求**
+
+```
+DELETE /messages/conversations/{conversationId}
+Authorization: Bearer {accessToken}
+```
+
+**URL 参数**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| conversationId | number | 会话 ID |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": null
+}
+```
+
+**错误情况**
+
+- 401: 未登录
+- 403: 非会话参与者
+- 404: 会话不存在
+
+**备注**
+
+- 需要认证
+- **软删除（隐藏）**：将当前用户侧 `a/b_hidden` 标志置 1，会话列表（接口 1）不再返回该会话；**不影响对方**，对方仍可继续查看和发送
+- 对方再发新消息时，后端将当前用户的 `hidden` 标志重置为 0（会话重新出现）
+- **幂等**：重复删除仍返回 200
+- 物理删除消息走 `ON DELETE CASCADE`（用户注销/会话删除时消息随之清理），普通用户不提供物理删除入口
+
+---
+
+#### 7. 全局未读私信数
+
+**请求**
+
+```
+GET /messages/unread-count
+Authorization: Bearer {accessToken}
+```
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "count": 5
+  }
+}
+```
+
+**错误情况**
+
+- 401: 未登录
+
+**备注**
+
+- 需要认证
+- `count` = 当前用户参与的所有会话 `a/b_unread_count` 之和（`SUM(a_unread_count) WHERE user_a_id=me` + `SUM(b_unread_count) WHERE user_b_id=me`，`sum` 在无匹配行时返回 NULL，应用层兜底为 0）
+- **私信未读的唯一权威源**：私信未读已从通知系统下线，`GET /notifications/unread-count` 的 `byType` 不再包含 `message`；Header 铃铛「私信」入口角标、`/messages` 页会话列表角标均取自本接口
+
+---
+
+#### 前端接入约定
+
+| 位置 | 接口 | 交互 |
+|------|------|------|
+| Header 铃铛「私信」入口 / `/messages?tab=message` | `GET /messages/conversations` | 会话列表（头像 + 昵称 + 最后消息摘要 + 未读角标 + 时间） |
+| 用户头像旁「私信」按钮（文章详情/评论区等） | `GET /messages/conversations/with/{userId}` 初始化 → `router.push('/messages?userId={peerId}')` | 未登录点击 → 弹登录框；看自己不展示按钮 |
+| `/messages?userId={peerId}` 选中会话 | `GET /messages/conversations/{conversationId}/messages` | 气泡聊天窗，按时间倒序分页加载 |
+| 发送消息 | `POST /messages` | 成功后本地追加气泡，更新会话列表 `lastMessagePreview`/`lastMessageAt` |
+| 打开会话/切换会话 | `PUT /messages/conversations/{conversationId}/read` | 清零该会话未读（乐观清角标），随后刷新 `GET /messages/unread-count` 同步铃铛「私信」角标 |
+| 删除会话 | `DELETE /messages/conversations/{conversationId}` | `ElMessageBox.confirm` 确认后本地移除行，删除后刷新 `GET /messages/unread-count` |
+| Header 铃铛「私信」角标 | `GET /messages/unread-count` | 私信未读总数（登录时拉取，登出清空）；与通知 `byType` 无关 |
+
+**实时性**：一期不做 WebSocket 推送；Header 登录时拉一次 `GET /messages/unread-count`，`/messages` 页在标记已读 / 删除会话后主动刷新该值即可。后续可接入 `NotificationWebSocketHandler` 做实时推送。
+
+**XSS**：`content` 为纯文本，前端渲染时必须转义或用 `<text>`/纯文本节点展示，禁止 `v-html`。
+
+**错误码**：与通用错误码一致（401/400/403/404），无新增业务码。
 
 ---
 
