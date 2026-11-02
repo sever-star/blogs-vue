@@ -20,6 +20,19 @@ export const NOTIFICATION_TABS = [
 
 export type NotificationTab = (typeof NOTIFICATION_TABS)[number]['key']
 
+/**
+ * 各 tab 对应的原始 type 集合（与服务端 types 过滤一致）。
+ * 「点赞收藏」聚合一切点赞/收藏行为（含评论被点赞 comment_like），
+ * 「评论通知」只含评论与回复。
+ */
+const TAB_TYPES: Record<NotificationTab, NotificationType[]> = {
+  comment: ['post_comment', 'comment_reply'],
+  like: ['like', 'comment_like', 'favorite'],
+  follow: ['follow'],
+  // 私信通知已下线，旧 message 数据归系统 tab 展示
+  system: ['announcement', 'system', 'message'],
+}
+
 /** 各 tab 未读计数初始空表 */
 function emptyTabs(): Record<string, number> {
   return { comment: 0, like: 0, follow: 0, system: 0 }
@@ -30,9 +43,9 @@ function tabOf(type: NotificationType): NotificationTab {
   switch (type) {
     case 'post_comment':
     case 'comment_reply':
-    case 'comment_like':
       return 'comment'
     case 'like':
+    case 'comment_like':
     case 'favorite':
       return 'like'
     case 'follow':
@@ -85,11 +98,11 @@ export const useNotificationStore = defineStore('notification', () => {
     }
   }
 
-  /** 拉通知列表（按激活 tab 过滤后的前端列表） */
-  const fetchList = async (page = 1, pageSize = 50) => {
+  /** 拉通知列表（按激活 tab 的 type 集合服务端过滤，total 即该 tab 总数） */
+  const fetchList = async (page = 1, pageSize = 20) => {
     loading.value = true
     try {
-      const res = await getNotifications(page, pageSize, false)
+      const res = await getNotifications(page, pageSize, false, TAB_TYPES[activeTab.value])
       list.value = res.data ?? []
       total.value = Number(res.total ?? 0)
     } catch (e) {
@@ -100,9 +113,9 @@ export const useNotificationStore = defineStore('notification', () => {
     }
   }
 
-  /** 当前 tab 下展示的通知（前端分组，避免为每个分类多打一个接口） */
+  /** 当前 tab 下展示的通知（已由服务端按 tab 过滤，直接返回） */
   const visibleList = () => {
-    return list.value.filter(n => tabOf(n.type) === activeTab.value)
+    return list.value
   }
 
   /** 标记单条已读（成功后本地置已读 + 总数与对应 tab 各减一） */

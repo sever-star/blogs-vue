@@ -73,7 +73,7 @@
           v-model:current-page="page"
           :page-size="pageSize"
           :total="total"
-          layout="total, prev, pager, next"
+          layout="prev, pager, next"
           background
           @current-change="load"
         />
@@ -97,6 +97,8 @@ const notifStore = useNotificationStore()
 const page = ref(1)
 const pageSize = 20
 const total = ref(0)
+// onMounted 完成首次加载前，activeTab 的程序式赋值不应触发重复 load
+let initialized = false
 
 /** 支持的 tab 名（五个分类的 key 集合），用于校验 URL 上的 ?tab= */
 const TAB_KEYS = NOTIFICATION_TABS.map(t => t.key as string)
@@ -177,10 +179,11 @@ function normalizeTab(tab: unknown): NotificationTab {
     : NOTIFICATION_TABS[0].key
 }
 
-// 切 tab 时回到第一页，并同步到 URL（刷新/分享保持当前模块）
+// 切 tab 时回到第一页、同步到 URL，并按新 tab 服务端拉取（列表已按 tab 过滤）
 watch(() => notifStore.activeTab, (tab: NotificationTab) => {
   page.value = 1
   router.replace({ query: { tab } })
+  if (initialized) load()
 })
 
 // 已在本页时从铃铛再点快捷入口：只有 query 变、组件不重挂载，
@@ -200,6 +203,7 @@ onMounted(async () => {
   }
   await notifStore.fetchUnreadCount()
   await load()
+  initialized = true
 })
 </script>
 

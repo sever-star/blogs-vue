@@ -2,15 +2,21 @@ import client from './client'
 import type { Notification, PaginatedResponse } from '@/types'
 
 /**
- * 通知列表（分页，可只看未读）
- * GET /notifications?page=&pageSize=&onlyUnread=
+ * 通知列表（分页，可只看未读，可按 types 过滤分类模块）
+ * GET /notifications?page=&pageSize=&onlyUnread=&types=&types=
+ * types 为空则返回全部类型；传数组时序列化为重复 key（types=a&types=b）
  */
 export const getNotifications = async (
   page = 1,
   pageSize = 50,
-  onlyUnread = false
+  onlyUnread = false,
+  types?: string[]
 ): Promise<PaginatedResponse<Notification>> => {
-  return client.get('/notifications', { params: { page, pageSize, onlyUnread } })
+  return client.get('/notifications', {
+    params: { page, pageSize, onlyUnread, types },
+    // 数组用重复 key（不带 []），匹配后端 @RequestParam List<String>
+    paramsSerializer: { indexes: false },
+  })
 }
 
 /** 未读数 GET /notifications/unread-count

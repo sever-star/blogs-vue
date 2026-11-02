@@ -3006,17 +3006,29 @@ Authorization: Bearer {accessToken}
 **请求**
 
 ```
-GET /notifications?page=1&pageSize=10&onlyUnread=false
+GET /notifications?page=1&pageSize=10&onlyUnread=false&types=post_comment&types=comment_reply
 Authorization: Bearer {accessToken}
 ```
 
 **Query 参数**
 
-| 参数       | 类型    | 必需 | 说明                 |
-| ---------- | ------- | ---- | -------------------- |
-| page       | number  | 否   | 页码，默认 1         |
-| pageSize   | number  | 否   | 每页条数，默认 10    |
-| onlyUnread | boolean | 否   | 只看未读，默认 false |
+| 参数       | 类型     | 必需 | 说明                                                                 |
+| ---------- | -------- | ---- | -------------------------------------------------------------------- |
+| page       | number   | 否   | 页码，默认 1                                                         |
+| pageSize   | number   | 否   | 每页条数，默认 10                                                    |
+| onlyUnread | boolean  | 否   | 只看未读，默认 false                                                 |
+| types      | string[] | 否   | 按原始 type 过滤（重复 key 传多值）；缺省返回全部类型。用于分类模块分页 |
+
+**`types` 与前端分类 tab 的映射**
+
+| tab      | types                                                    |
+| -------- | -------------------------------------------------------- |
+| 评论通知 | `post_comment`, `comment_reply`                          |
+| 点赞收藏 | `like`, `comment_like`, `favorite`                       |
+| 关注     | `follow`                                                 |
+| 系统     | `announcement`, `system`, `message`（旧私信数据归系统） |
+
+> 传 `types` 后 `total` 为该分类下的总数，分页以该值为准。
 
 **返回**（`PageResult` 结构）
 
