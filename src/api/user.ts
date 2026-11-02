@@ -37,3 +37,14 @@ export const updateUserStatus = async (
 ): Promise<User> => {
   return client.put(`/users/${id}/status`, { status })
 }
+
+/**
+ * 重置用户密码（仅管理员）：将目标用户密码重置为默认密码
+ * POST /users/{id}/reset-password
+ * 返回 { message: 重置后的密码 }，用于管理员转告用户
+ */
+export const resetUserPassword = async (
+  id: number
+): Promise<{ message: string }> => {
+  return client.post(`/users/${id}/reset-password`)
+}

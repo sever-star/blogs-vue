@@ -55,10 +55,17 @@
         <el-table-column label="最后登录" width="180">
           <template #default="{ row }">{{ formatDate(row.lastLoginAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="90" align="center">
+        <el-table-column label="操作" width="140" align="center">
           <template #default="{ row }">
             <el-tag v-if="isSelf(row)" size="small" type="info">我</el-tag>
-            <span v-else class="muted">—</span>
+            <el-button
+              v-else
+              type="primary"
+              link
+              size="small"
+              :disabled="pendingId === row.id"
+              @click="handleResetPassword(row)"
+            >重置密码</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -82,7 +89,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { getUsersPaged, updateUserRole, updateUserStatus } from "@/api/user";
+import { getUsersPaged, updateUserRole, updateUserStatus, resetUserPassword } from "@/api/user";
 import type { UserRole } from "@/api/user";
 import type { User } from "@/types";
 import { useAuthStore } from "@/stores/auth";
@@ -208,6 +215,37 @@ function beforeToggleStatus(row: User): Promise<boolean> {
       pendingId.value = null;
     }
   });
+}
+
+/**
+ * 重置密码：确认后调接口，成功后把后端返回的重置密码提示给管理员，
+ * 便于转告用户。重置为默认密码，用户登录后可自行修改。
+ */
+async function handleResetPassword(row: User) {
+  if (pendingId.value !== null) return;
+  try {
+    await ElMessageBox.confirm(
+      `确定将用户「${row.username}」的密码重置为默认密码吗？重置后该用户需用新密码登录。`,
+      "重置密码",
+      { type: "warning", confirmButtonText: "重置", cancelButtonText: "取消" }
+    );
+  } catch {
+    return; // 取消
+  }
+  pendingId.value = row.id;
+  try {
+    const res = await resetUserPassword(row.id);
+    // 后端返回 { message: 重置后的密码 }
+    ElMessageBox.alert(
+      `用户「${row.username}」的密码已重置为：${res.message}\n请将密码转告该用户，并提醒其登录后尽快修改。`,
+      "重置成功",
+      { type: "success", confirmButtonText: "我知道了" }
+    );
+  } catch (e: any) {
+    ElMessage.error(e?.message || "重置密码失败");
+  } finally {
+    pendingId.value = null;
+  }
 }
 
 function formatDate(date?: string | null): string {
