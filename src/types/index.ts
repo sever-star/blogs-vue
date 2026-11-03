@@ -62,6 +62,8 @@ export interface ArticleListItem {
   status: number
   /** 审核状态：0=待审核 1=通过 2=拒绝（仅 GET /posts/mine 返回，其余接口为空） */
   reviewStatus?: number
+  /** 计划发布时间（非空且审核通过后未到点表示定时待发布） */
+  scheduledAt?: string
   allowComment: boolean
   isTop: boolean
   createdAt: string
@@ -174,6 +176,8 @@ export interface ArticlePayload {
   readingTime?: number
   status?: number // 发布状态：0=草稿 1=已发布 2=已下架；审核状态看 review_status（0待审核/1通过/2拒绝）
   allowComment?: boolean
+  /** 定时发布时间（ISO 字符串）；非空且未来时间 → 审核通过后在设定时间自动发布 */
+  scheduledAt?: string
 }
 
 /** 文章查询参数（首页文章列表，不支持分页，仅支持筛选/搜索） */

@@ -174,6 +174,26 @@
             </p>
           </div>
         </el-form-item>
+
+        <!-- 定时发布（可选）：开启后文章审核通过，在设定时间由后端自动发布 -->
+        <el-form-item label="定时发布">
+          <div class="schedule-field">
+            <el-switch v-model="formData.scheduledEnabled" />
+            <el-date-picker
+              v-if="formData.scheduledEnabled"
+              v-model="formData.scheduledAt"
+              type="datetime"
+              placeholder="选择发布时间"
+              format="YYYY-MM-DD HH:mm"
+              value-format="YYYY-MM-DDTHH:mm:ss"
+              :disabled-date="(d) => d.getTime() < new Date().setHours(0, 0, 0, 0)"
+              class="schedule-picker"
+            />
+            <p class="schedule-hint">
+              开启后，文章审核通过将在设定时间自动发布；关闭则审核通过立即发布
+            </p>
+          </div>
+        </el-form-item>
       </el-form>
 
       <template #footer>
@@ -266,6 +286,9 @@ const formData = ref({
   content: "",
   coverImage: "",
   summary: "",
+  // 定时发布：开启后审核通过的文章在设定时间自动发布（由后端 ScheduledPostDispatcher 调度）
+  scheduledEnabled: false,
+  scheduledAt: "",
 });
 
 // 编辑器渲染出的 HTML（onHtmlChanged 回调产出），随创建/更新提交给后端存 content_html
@@ -325,6 +348,19 @@ async function handleGenerateSummary() {
   } finally {
     generatingSummary.value = false;
   }
+}
+
+/** 把 ISO 字符串格式化为本地可读时间，用于提交成功提示 */
+function formatScheduleTime(iso: string): string {
+  const t = new Date(iso);
+  if (isNaN(t.getTime())) return iso;
+  return t.toLocaleString("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 /** 选中本地封面：立即上传 OSS，拿到 URL 写入表单，提交时随 coverImage 一起保存 */
@@ -410,6 +446,19 @@ function validateForm(): boolean {
     return false;
   }
 
+  // 定时发布：开启时必须选择一个未来的时间点
+  if (formData.value.scheduledEnabled) {
+    if (!formData.value.scheduledAt) {
+      ElMessage.warning("请选择定时发布时间");
+      return false;
+    }
+    const t = new Date(formData.value.scheduledAt).getTime();
+    if (isNaN(t) || t <= Date.now()) {
+      ElMessage.warning("定时发布时间必须晚于当前时间");
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -471,6 +520,11 @@ async function loadArticleForEdit() {
   formData.value.content = article.contentMd;
   formData.value.coverImage = article.coverImage || "";
   formData.value.summary = article.summary || "";
+  // 预填定时发布：已有计划时间则开启并回填（截掉秒以后的精度以匹配 picker value-format）
+  formData.value.scheduledEnabled = !!article.scheduledAt;
+  formData.value.scheduledAt = article.scheduledAt
+    ? article.scheduledAt.replace(/\.\d+$/, "").slice(0, 19)
+    : "";
 }
 
 /**
@@ -521,9 +575,17 @@ async function handleConfirm() {
         // 占位：编辑的发布/审核状态由后端按新语义决定
         // （草稿保持草稿 0，已发布的编辑期间下架 2，同时 review_status 归 0 重审）
         status: 0,
+        // 定时发布：开启带时间，关闭传 null 取消已有定时（always-set 语义见后端 updatePost）
+        scheduledAt: formData.value.scheduledEnabled
+          ? formData.value.scheduledAt
+          : null,
       });
       // 保存修改后留在编辑页（文章已进入重审，跳详情页看到的是下架状态，没有意义）
-      ElMessage.success("修改已保存，等待重新审核");
+      ElMessage.success(
+        formData.value.scheduledEnabled
+          ? `修改已保存，审核通过后将于 ${formatScheduleTime(formData.value.scheduledAt)} 自动发布`
+          : "修改已保存，等待重新审核"
+      );
       metaDialogVisible.value = false;
       return;
     }
@@ -544,6 +606,10 @@ async function handleConfirm() {
       // 摘要可选：留空不传保持 NULL；编辑草稿时同编辑逻辑带空串以便覆盖
       summary: formData.value.summary.trim() || undefined,
       status: 0,
+      // 定时发布：开启带时间，关闭传 null（新建 null 即无定时）
+      scheduledAt: formData.value.scheduledEnabled
+        ? formData.value.scheduledAt
+        : null,
     };
 
     if (draftId.value !== null) {
@@ -565,7 +631,11 @@ async function handleConfirm() {
       return;
     }
 
-    ElMessage.success("已提交审核，等待管理员审核");
+    ElMessage.success(
+      formData.value.scheduledEnabled
+        ? `已提交审核，审核通过后将于 ${formatScheduleTime(formData.value.scheduledAt)} 自动发布`
+        : "已提交审核，等待管理员审核"
+    );
     handleReset();
 
     // 返回首页
@@ -668,6 +738,9 @@ function handleReset() {
     tags: [],
     content: "",
     coverImage: "",
+    summary: "",
+    scheduledEnabled: false,
+    scheduledAt: "",
   };
   contentHtml.value = "";
   draftId.value = null;
@@ -836,6 +909,26 @@ function handleLogin() {
 
 .ai-btn {
   flex-shrink: 0;
+}
+
+/* 定时发布：开关 + 时间选择 + 提示纵向排列 */
+.schedule-field {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  width: 100%;
+}
+
+.schedule-picker {
+  width: 220px;
+}
+
+.schedule-hint {
+  margin: 0;
+  width: 100%;
+  font-size: 12px;
+  color: #909399;
 }
 
 /* 摘要为多行文本域：按钮与首行顶对齐，不随文本域高度垂直居中 */

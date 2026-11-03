@@ -469,7 +469,8 @@ Content-Type: application/json
   "tags": [1, 2] (标签ID数组，至少 1 个，最多 5 个),
   "readingTime": 15 (预估阅读时间（分钟），可选),
   "status": 0 (发布状态:0=草稿, 1=已发布, 2=已下架，可选，默认0；审核状态由 review_status 表示:0=待审核, 1=通过, 2=拒绝),
-  "allowComment": true (是否允许评论，可选，默认true)
+  "allowComment": true (是否允许评论，可选，默认true),
+  "scheduledAt": "2026-11-03T10:00:00" (定时发布时间，可选；非空且未来时间 → 审核通过后由 ScheduledPostDispatcher 在该时间自动发布；为 null 表示不定时)
 }
 ```
 
@@ -548,7 +549,8 @@ Content-Type: application/json
   "tags": [1, 2] (可选，标签 ID 数组；传空数组 [] 表示清空标签)",
   "readingTime": "number (可选)",
   "status": "number (可选，发布状态 0=草稿 1=已发布 2=已下架；实际状态由后端按编辑流程决定)",
-  "allowComment": "boolean (可选)"
+  "allowComment": "boolean (可选)",
+  "scheduledAt": "2026-11-03T10:00:00 或 null (always-set：前端每次提交都携带；非空未来时间设置/更新定时，null 取消已有定时)"
 }
 ```
 
@@ -691,6 +693,12 @@ Authorization: Bearer {accessToken}
 ```
 
 > **字段映射**：`blog_posts` 实体**没有 `comment_count` 列**，`commentCount` 由 `blog_comments` 聚合。详见末尾「实现差异与字段映射」。
+
+**定时发布**
+
+- 审核通过时若文章 `scheduledAt` 非空：由 `ScheduledPostDispatcher` 入 Redis 延迟队列，到点自动发布（`status` 置 1）；若 `scheduledAt` 已过当前时间，立即发布。
+- `scheduledAt` 为空：审核通过即立即发布。
+- 停机恢复：服务启动时扫描 `status=0 且 scheduledAt 非空` 的待发稿重新入队；DB 兜底每分钟补发逾期未发稿。
 
 **错误情况**
 
