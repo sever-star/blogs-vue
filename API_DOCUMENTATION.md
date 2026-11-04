@@ -2179,22 +2179,23 @@ Authorization: Bearer {accessToken}
 | 我的主页「关注的用户」选择栏 ✅ | `GET /follows/mine` | 头像 + 昵称 + `@用户名` + 简介行展示；暂无用户级主页，行不可跳转 |
 | 我的主页「赞过的文章」 | `GET /posts/liked` | 复用 `ArticleCard` 渲染，点击进文章详情 |
 | 我的主页「收藏的文章」 | `GET /posts/favorited` | 同上 |
-| 我的主页「文章 / 获赞 / 粉丝」统计卡 ✅ | `GET /users/{userId}/stats` | 进入主页时拉取，三个数字绑定到头像卡片；加载中显示 `…` |
+| 我的主页「文章 / 获赞 / 浏览 / 粉丝」统计卡 ✅ | `GET /auth/{userId}` | 进入主页时拉取，四个数字绑定到头像卡片；加载中显示 `…` |
 
 ---
 
 ## 用户统计接口
 
-> **公开**：返回用户主页三个聚合计数（文章 / 获赞 / 粉丝），不含任何敏感字段，
-> 故 SecurityConfig 将 `GET /api/users/*/stats` 声明为 `permitAll`（声明早于管理员规则）。
-> 路径前缀 `/api/users`，与「用户管理接口」（`/api/users/**`，ADMIN 专属）解耦。
+> 返回用户主页四个聚合计数（文章 / 获赞 / 浏览 / 粉丝），不含敏感字段。
+> 挂在认证控制器下：路径前缀 `/api/auth`，与「用户管理接口」（`/api/users/**`，ADMIN 专属）解耦。
+> SecurityConfig 将 `GET /api/auth/*` 声明为 `authenticated()`（与 `/api/auth/me` 同口径，需登录）。
 
 ### 1. 获取用户主页统计
 
 **请求**
 
 ```
-GET /users/{userId}/stats
+GET /auth/{userId}
+Authorization: Bearer {accessToken}
 ```
 
 **路径参数**
@@ -2212,6 +2213,7 @@ GET /users/{userId}/stats
   "data": {
     "articleCount": 12,
     "likeCount": 358,
+    "viewCount": 10234,
     "followerCount": 47
   }
 }
@@ -2223,6 +2225,7 @@ GET /users/{userId}/stats
 | ------------- | ---- | ----------------------------------------------------------------------------------- |
 | articleCount  | int  | 该用户**已发布**（status=1）且未软删的文章数；草稿/已下架不计                       |
 | likeCount     | int  | 该用户已发布文章收到的点赞总数（`SUM(blog_posts.like_count)`）；获赞数，非给出赞数 |
+| viewCount     | int  | 该用户已发布文章的累计浏览量（`SUM(blog_posts.view_count)`）                        |
 | followerCount | int  | 关注该用户的粉丝数（`blog_follows.followee_id` 计数）                               |
 
 **错误情况**
@@ -2231,8 +2234,8 @@ GET /users/{userId}/stats
 
 **备注**
 
-- 公开接口，游客亦可访问（计数均为对外可见口径）
-- 我的主页「文章 / 获赞 / 粉丝」三个 stat 卡片取自本接口；进入主页时随 `loadLiked` 一起拉取
+- 需登录（`GET /api/auth/*` authenticated）
+- 我的主页「文章 / 获赞 / 浏览 / 粉丝」四个 stat 卡片取自本接口；进入主页时随 `loadLiked` 一起拉取
 
 ---
 

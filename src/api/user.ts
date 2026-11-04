@@ -6,19 +6,20 @@ export type { User, PageQuery, PaginatedResponse }
 /** 用户角色 */
 export type UserRole = 'ADMIN' | 'USER'
 
-/** 用户主页统计：文章数 / 获赞数 / 粉丝数 */
+/** 用户主页统计：文章数 / 获赞数 / 浏览量 / 粉丝数 */
 export interface UserStats {
   articleCount: number
   likeCount: number
+  viewCount: number
   followerCount: number
 }
 
 /**
- * 获取用户主页统计（公开接口）
- * GET /users/{userId}/stats → { articleCount, likeCount, followerCount }
+ * 获取用户主页统计（需登录）
+ * GET /auth/{userId} → { articleCount, likeCount, viewCount, followerCount }
  */
 export const getUserStats = async (userId: number): Promise<UserStats> => {
-  return client.get(`/users/${userId}/stats`)
+  return client.get(`/auth/${userId}`)
 }
 
 /**

@@ -21,6 +21,10 @@
               获赞
             </span>
             <span class="stat">
+              <b>{{ statsLoading ? '…' : stats.viewCount }}</b>
+              浏览
+            </span>
+            <span class="stat">
               <b>{{ statsLoading ? '…' : stats.followerCount }}</b>
               粉丝
             </span>
@@ -238,7 +242,8 @@ onMounted(() => {
 .stat-row {
   display: flex;
   justify-content: center;
-  gap: 32px;
+  flex-wrap: wrap;
+  gap: 16px 20px;
 }
 
 .stat {
