@@ -3096,13 +3096,14 @@ Authorization: Bearer {accessToken}
     "byType": {
       "post_comment": 1,
       "like": 1,
-      "announcement": 1
+      "announcement": 1,
+      "message": 2
     }
   }
 }
 ```
 
-> `count`：总未读数（铃铛徽标用，向后兼容）。`byType`：按**原始 type** 分组的未读数（一次 `GROUP BY type` 查询产出），前端按 `tabOf` 聚合成 5 个 tab 的角标：comment ← post_comment/comment_reply/comment_like；like ← like/favorite；follow ← follow；message ← message；system ← system/announcement。`byType` 缺失或某 type 不在表里时按 0 处理。
+> `count`：总未读数（含私信未读，铃铛徽标用）。`byType`：按**原始 type** 分组的未读数（`GROUP BY type` 查询产出），其中 `message` = 私信未读（来自 `blog_messages`，由 `MessagesRepository.countUnread` 注入，**非** `blog_notifications` 物化副本）。前端按 `tabOf` 聚合成 4 个通知 tab 的角标：comment ← post_comment/comment_reply/comment_like；like ← like/favorite；follow ← follow；system ← system/announcement；`message` **不进任何 tab**（私信已从通知系统下线），前端仅用 `byType["message"]` 从 `count` 中扣除，使铃铛总数只反映通知未读。`byType` 缺失或某 type 不在表里时按 0 处理。
 
 ---
 
@@ -4117,7 +4118,7 @@ Authorization: Bearer {accessToken}
 
 - 需要认证
 - `count` = 当前用户参与的所有会话 `a/b_unread_count` 之和（`SUM(a_unread_count) WHERE user_a_id=me` + `SUM(b_unread_count) WHERE user_b_id=me`，`sum` 在无匹配行时返回 NULL，应用层兜底为 0）
-- **私信未读的唯一权威源**：私信未读已从通知系统下线，`GET /notifications/unread-count` 的 `byType` 不再包含 `message`；Header 铃铛「私信」入口角标、`/messages` 页会话列表角标均取自本接口
+- **私信未读的唯一权威源**：私信未读已从通知系统下线（不再向 `blog_notifications` 物化 `type='message'` 副本）。`GET /notifications/unread-count` 的 `byType` 里仍保留一个 `message` key（由本接口同源的 `MessagesRepository.countUnread` 注入），仅供前端从铃铛总数中扣除、使铃铛只显示通知未读；**不进任何通知 tab 角标**。Header 铃铛「私信」入口角标、`/messages` 页会话列表角标均取自本接口
 
 ---
 
