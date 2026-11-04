@@ -35,7 +35,7 @@
         </div>
       </aside>
 
-      <!-- 右侧：三个选择栏（赞过 / 收藏 / 关注） -->
+      <!-- 右侧：四个选择栏（赞过 / 收藏 / 关注 / 粉丝） -->
       <main class="profile-main">
         <el-card shadow="never" class="profile-card">
           <el-tabs v-model="activeTab" @tab-change="onTabChange">
@@ -79,6 +79,27 @@
                 </div>
               </div>
             </el-tab-pane>
+            <el-tab-pane label="我的粉丝" name="followers">
+              <div v-if="followersLoading" class="tab-skeleton">
+                <el-skeleton :rows="4" animated />
+              </div>
+              <el-empty v-else-if="followersError" :description="followersError">
+                <el-button type="primary" @click="loadFollowers">重试</el-button>
+              </el-empty>
+              <el-empty v-else-if="followerUsers.length === 0" description="还没有粉丝" />
+              <div v-else class="following-list">
+                <div v-for="u in followerUsers" :key="u.id" class="following-row">
+                  <el-avatar :src="u.avatar || undefined" :size="44">
+                    {{ (u.nickname || u.username || '?').charAt(0) }}
+                  </el-avatar>
+                  <div class="following-info">
+                    <span class="following-nickname">{{ u.nickname || u.username }}</span>
+                    <span class="following-username">@{{ u.username }}</span>
+                    <span v-if="u.bio" class="following-bio">{{ u.bio }}</span>
+                  </div>
+                </div>
+              </div>
+            </el-tab-pane>
           </el-tabs>
         </el-card>
       </main>
@@ -93,7 +114,7 @@ import { storeToRefs } from 'pinia'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { getLikedArticles } from '@/api/article'
-import { getFollowing } from '@/api/follow'
+import { getFollowing, getFollowers } from '@/api/follow'
 import { getUserStats, type UserStats } from '@/api/user'
 import type { ArticleListItem, User } from '@/types'
 import ArticleCard from '@/components/ArticleCard.vue'
@@ -118,8 +139,8 @@ async function loadStats() {
   }
 }
 
-// 三个选择栏：收藏 / 关注 接口待后端实现，先占位
-const activeTab = ref<'liked' | 'favorites' | 'following'>('liked')
+// 四个选择栏：赞过 / 收藏 / 关注 / 粉丝
+const activeTab = ref<'liked' | 'favorites' | 'following' | 'followers'>('liked')
 
 // ---- 赞过的文章 ----
 const likedArticles = ref<ArticleListItem[]>([])
@@ -141,13 +162,16 @@ async function loadLiked() {
   }
 }
 
-/** 切换到「赞过的文章」时懒加载（仅首次）；「收藏的文章」接口待实现 */
+/** 切换 tab 时懒加载（仅首次）；「收藏的文章」接口待实现 */
 function onTabChange(name: string | number) {
   if (name === 'liked' && !likedLoaded.value && !likedLoading.value) {
     loadLiked()
   }
   if (name === 'following' && !followingLoaded.value && !followingLoading.value) {
     loadFollowing()
+  }
+  if (name === 'followers' && !followersLoaded.value && !followersLoading.value) {
+    loadFollowers()
   }
 }
 
@@ -168,6 +192,27 @@ async function loadFollowing() {
     ElMessage.error(followingError.value)
   } finally {
     followingLoading.value = false
+  }
+}
+
+// ---- 我的粉丝 ----
+const followerUsers = ref<User[]>([])
+const followersLoading = ref(false)
+const followersError = ref('')
+const followersLoaded = ref(false)
+
+async function loadFollowers() {
+  if (!user.value?.id) return
+  followersLoading.value = true
+  followersError.value = ''
+  try {
+    followerUsers.value = await getFollowers(user.value.id)
+    followersLoaded.value = true
+  } catch (e: any) {
+    followersError.value = e?.message || '加载失败，请稍后重试'
+    ElMessage.error(followersError.value)
+  } finally {
+    followersLoading.value = false
   }
 }
 

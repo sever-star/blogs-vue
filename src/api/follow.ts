@@ -48,3 +48,12 @@ export const getFollowStatus = async (userId: number): Promise<boolean> => {
 export const getFollowing = async (): Promise<User[]> => {
   return client.get('/follows/mine')
 }
+
+/**
+ * 我的粉丝列表
+ * GET /follows/fans?followeeId={userId}
+ * 返回关注 followeeId 的用户列表，字段同 /follows/mine
+ */
+export const getFollowers = async (userId: number): Promise<User[]> => {
+  return client.get('/follows/fans', { params: { followeeId: userId } })
+}

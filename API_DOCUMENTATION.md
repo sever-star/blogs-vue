@@ -2171,12 +2171,59 @@ Authorization: Bearer {accessToken}
 
 ---
 
-### 5. 前端接入约定
+### 5. 我的粉丝列表
+
+**请求**
+
+```
+GET /follows/fans?followeeId={userId}
+Authorization: Bearer {accessToken}
+```
+
+**Query 参数**
+
+| 参数        | 类型 | 必填 | 说明             |
+| ----------- | ---- | ---- | ---------------- |
+| followeeId  | int  | 是   | 被关注的用户 id  |
+
+**返回**
+
+`data` 为关注 `followeeId` 的粉丝数组（**不含邮箱等敏感字段**），字段同 `/follows/mine`：
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": [
+    {
+      "id": 3,
+      "username": "fan1",
+      "nickname": "粉丝昵称",
+      "avatar": "https://…/avatar.png",
+      "bio": "简介…",
+      "createdAt": "2026-02-01T12:00:00"
+    }
+  ]
+}
+```
+
+**错误情况**
+
+- 401: 未登录
+
+**备注**
+
+- 我的主页「我的粉丝」选择栏数据源；通常传当前用户 id
+
+---
+
+### 6. 前端接入约定
 
 | 位置 | 接口 | 交互 |
 |---|---|---|
 | 详情页作者卡片「关注」按钮 ✅ | `GET /follows/{userId}/status` 初始化；点击 `POST`/`DELETE` 切换 | 未登录点击 → 弹登录框；成功后按钮在「关注 ↔ 已关注」间切换；看自己文章不展示按钮 |
 | 我的主页「关注的用户」选择栏 ✅ | `GET /follows/mine` | 头像 + 昵称 + `@用户名` + 简介行展示；暂无用户级主页，行不可跳转 |
+| 我的主页「我的粉丝」选择栏 ✅ | `GET /follows/fans?followeeId={userId}` | 复用关注列表行样式；切换到该 tab 时懒加载（仅首次） |
 | 我的主页「赞过的文章」 | `GET /posts/liked` | 复用 `ArticleCard` 渲染，点击进文章详情 |
 | 我的主页「收藏的文章」 | `GET /posts/favorited` | 同上 |
 | 我的主页「文章 / 获赞 / 浏览 / 粉丝」统计卡 ✅ | `GET /auth/{userId}` | 进入主页时拉取，四个数字绑定到头像卡片；加载中显示 `…` |
