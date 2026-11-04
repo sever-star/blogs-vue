@@ -817,6 +817,10 @@ function handleLogin() {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  /* 隔离层叠上下文：md-editor 内部代码块头部等元素自带高 z-index，
+     会穿透到 el-dialog（提交审核/保存草稿信息弹窗，teleport 到 body，z-index~2001）之上。
+     加 isolate 把编辑器内部所有 z-index 关在本容器内，弹窗永远盖在编辑器之上 */
+  isolation: isolate;
 }
 
 .cover-field {
