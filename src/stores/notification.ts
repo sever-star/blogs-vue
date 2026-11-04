@@ -29,8 +29,9 @@ const TAB_TYPES: Record<NotificationTab, NotificationType[]> = {
   comment: ['post_comment', 'comment_reply'],
   like: ['like', 'comment_like', 'favorite'],
   follow: ['follow'],
-  // 私信通知已下线，旧 message 数据归系统 tab 展示
-  system: ['announcement', 'system', 'message'],
+  // 私信已从通知系统下线（未读走独立 /messages/unread-count，入口在铃铛「私信」按钮），
+  // 系统 tab 只含公告与系统通知，不再混入 message，避免公告页显示私信条目/计数
+  system: ['announcement', 'system'],
 }
 
 /** 各 tab 未读计数初始空表 */
@@ -51,7 +52,7 @@ function tabOf(type: NotificationType): NotificationTab {
     case 'follow':
       return 'follow'
     case 'message':
-      // 私信通知已下线，旧数据归到系统 tab 展示
+      // 私信已下线、不在任何 tab 列出；此处仅作兜底（理论不可达，message 通知不会进入 markRead/remove 路径）
       return 'system'
     default:
       return 'system'
