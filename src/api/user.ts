@@ -6,6 +6,21 @@ export type { User, PageQuery, PaginatedResponse }
 /** 用户角色 */
 export type UserRole = 'ADMIN' | 'USER'
 
+/** 用户主页统计：文章数 / 获赞数 / 粉丝数 */
+export interface UserStats {
+  articleCount: number
+  likeCount: number
+  followerCount: number
+}
+
+/**
+ * 获取用户主页统计（公开接口）
+ * GET /users/{userId}/stats → { articleCount, likeCount, followerCount }
+ */
+export const getUserStats = async (userId: number): Promise<UserStats> => {
+  return client.get(`/users/${userId}/stats`)
+}
+
 /**
  * 分页获取用户列表（仅管理员，支持 keyword 模糊搜索用户名/昵称/邮箱）
  * GET /users?page=&pageSize=&keyword=

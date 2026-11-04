@@ -13,12 +13,16 @@
           <el-divider style="margin: 16px 0" />
           <div class="stat-row">
             <span class="stat">
-              <b>—</b>
+              <b>{{ statsLoading ? '…' : stats.articleCount }}</b>
               文章
             </span>
             <span class="stat">
-              <b>—</b>
-              点赞
+              <b>{{ statsLoading ? '…' : stats.likeCount }}</b>
+              获赞
+            </span>
+            <span class="stat">
+              <b>{{ statsLoading ? '…' : stats.followerCount }}</b>
+              粉丝
             </span>
           </div>
           <div class="member-since">
@@ -86,12 +90,29 @@ import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { getLikedArticles } from '@/api/article'
 import { getFollowing } from '@/api/follow'
+import { getUserStats, type UserStats } from '@/api/user'
 import type { ArticleListItem, User } from '@/types'
 import ArticleCard from '@/components/ArticleCard.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const { user } = storeToRefs(authStore)
+
+// ---- 主页统计：文章 / 获赞 / 粉丝 ----
+const stats = ref<UserStats>({ articleCount: 0, likeCount: 0, followerCount: 0 })
+const statsLoading = ref(false)
+
+async function loadStats() {
+  if (!user.value?.id) return
+  statsLoading.value = true
+  try {
+    stats.value = await getUserStats(user.value.id)
+  } catch {
+    // 统计失败不阻断页面，保持 0 占位
+  } finally {
+    statsLoading.value = false
+  }
+}
 
 // 三个选择栏：收藏 / 关注 接口待后端实现，先占位
 const activeTab = ref<'liked' | 'favorites' | 'following'>('liked')
@@ -158,6 +179,7 @@ onMounted(() => {
     return
   }
   loadLiked()
+  loadStats()
 })
 </script>
 
