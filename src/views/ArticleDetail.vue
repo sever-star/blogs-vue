@@ -363,7 +363,16 @@ function handleMessage() {
   const id = authorId()
   if (id == null) return
   if (isAuthor.value) return // 看自己文章不展示私信入口，双保险
-  router.push({ path: '/messages', query: { userId: id } })
+  // 不在点击时建会话：只带 userId + 对方昵称/头像，进入草稿态，首条消息发送时才创建
+  const article = articleStore.currentArticle
+  router.push({
+    path: '/messages',
+    query: {
+      userId: id,
+      nick: article?.authorNickname || '',
+      avatar: article?.authorAvatar || '',
+    },
+  })
 }
 
 /** 下架文章（作者/管理员）：确认后调接口，store 同步 currentArticle.status，按钮随 canOffline 自动消失 */

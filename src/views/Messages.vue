@@ -105,17 +105,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
+import { useMessageWsStore } from '@/stores/messageWs'
 import {
   getConversations,
-  getOrCreateConversation,
   getConversationMessages,
-  sendMessage,
   markConversationRead,
   deleteConversation,
   type Conversation,
@@ -125,6 +124,7 @@ import {
 const route = useRoute()
 const authStore = useAuthStore()
 const notifStore = useNotificationStore()
+const wsStore = useMessageWsStore()
 const currentUserId = computed(() => authStore.user?.id)
 
 const conversations = ref<Conversation[]>([])
@@ -136,11 +136,30 @@ const loadingMsg = ref(false)
 const sending = ref(false)
 const chatBodyRef = ref<HTMLElement | null>(null)
 
+let offMessage: (() => void) | null = null
+
 onMounted(async () => {
+  // 订阅 WS 收到的私信：当前正看该会话则追加气泡 + 标记已读并校正角标，
+  // 否则返回 false 交给 messageWs store 弹桌面通知
+  offMessage = wsStore.onMessage((m: ChatMessage) => {
+    if (activeConversation.value?.id !== m.conversationId) return false
+    if (messages.value.some((x: ChatMessage) => x.id === m.id)) return true // 去重（重连补推等）
+    messages.value.push(m)
+    scrollToBottom()
+    markConversationRead(m.conversationId)
+      .then(() => notifStore.fetchMessageUnread())
+      .catch(() => {})
+    return true
+  })
   await loadConversations()
 })
 
-/** 拉取会话列表；若 URL 带 ?userId= 则获取/创建与该用户的会话并选中 */
+onUnmounted(() => {
+  offMessage?.()
+  offMessage = null
+})
+
+/** 拉取会话列表；若 URL 带 ?userId= 则打开与该用户的会话（已有则选中，无则进草稿态） */
 async function loadConversations() {
   loadingConv.value = true
   try {
@@ -151,7 +170,12 @@ async function loadConversations() {
     if (peerIdQuery) {
       const peerId = Number(peerIdQuery)
       if (!Number.isNaN(peerId) && peerId !== currentUserId.value) {
-        await openConversationWith(peerId)
+        // 草稿头部需要对方昵称/头像，由发起页（ArticleDetail）通过 query 带入
+        const peerInfo = {
+          nickname: typeof route.query.nick === 'string' ? route.query.nick : '',
+          avatar: typeof route.query.avatar === 'string' ? route.query.avatar : '',
+        }
+        await openConversationWith(peerId, peerInfo)
         return
       }
     }
@@ -165,25 +189,47 @@ async function loadConversations() {
   }
 }
 
-/** 通过 ?userId= 进入：获取或创建会话，合并进列表并选中 */
-async function openConversationWith(peerId: number) {
-  try {
-    const conv = await getOrCreateConversation(peerId)
-    const idx = conversations.value.findIndex((c) => c.id === conv.id)
-    if (idx >= 0) {
-      conversations.value[idx] = conv
-    } else {
-      conversations.value.unshift(conv)
-    }
-    await selectConversation(conv)
-  } catch (e: unknown) {
-    ElMessage.error((e as { message?: string })?.message || '打开会话失败')
+/**
+ * 通过 ?userId= 进入：打开与某用户的私信。
+ * 不再在点击时就建会话——若列表里已有与该用户的会话则直接选中；
+ * 否则进入「草稿态」（id=0 占位），会话在首条消息发送时由后端 addMessage 创建。
+ * peerInfo 来自发起页 query（昵称/头像），仅用于草稿头部展示。
+ */
+async function openConversationWith(
+  peerId: number,
+  peerInfo?: { nickname?: string; avatar?: string }
+) {
+  const existing = conversations.value.find((c: Conversation) => c.peerUser.id === peerId)
+  if (existing) {
+    await selectConversation(existing)
+    return
   }
+  const draft: Conversation = {
+    id: 0,
+    peerUser: {
+      id: peerId,
+      username: '',
+      nickname: peerInfo?.nickname || '',
+      avatar: peerInfo?.avatar || '',
+    },
+    lastMessagePreview: null,
+    lastMessageAt: null,
+    unreadCount: 0,
+    createdAt: '',
+    updatedAt: '',
+  }
+  // 草稿不进左栏列表——发送首条消息后才出现
+  await selectConversation(draft)
 }
 
 async function selectConversation(conv: Conversation) {
   if (activeConversation.value?.id === conv.id) return
   activeConversation.value = conv
+  // 草稿态（id=0）：会话尚未创建，无消息可拉、无未读可标记
+  if (conv.id === 0) {
+    messages.value = []
+    return
+  }
   await loadMessages(conv.id)
   // 有未读才标记，避免无意义请求；乐观清零角标，后端联动把 type=message 通知标已读后刷新铃铛
   if (conv.unreadCount > 0) {
@@ -223,17 +269,45 @@ async function handleSend() {
   }
   sending.value = true
   try {
-    const msg = await sendMessage({ receiverId: peerId, content })
-    messages.value.push(msg)
+    // 走 WebSocket：等 send_ack 回执，拿到落库后的完整消息（含 id/createdAt）
+    const msg = await wsStore.send({ receiverId: peerId, content })
     messageText.value = ''
-    // 本地更新会话列表的预览/时间，保持排序大致正确
-    activeConversation.value.lastMessagePreview = msg.content
-    activeConversation.value.lastMessageAt = msg.createdAt
+    const conv = activeConversation.value
+    if (conv.id === 0) {
+      // 草稿态：首条消息发送后后端才建会话。拿到真实 conversationId 后刷新左栏列表
+      // 并选中真实会话（loadMessages 会取回刚发的消息，含可能的对方并发消息）
+      await refreshConversationList()
+      const real = conversations.value.find((c: Conversation) => c.peerUser.id === peerId)
+      if (real) {
+        await selectConversation(real)
+      } else {
+        // 异常兜底：列表没找到新建会话，用 send_ack 数据就地转正
+        conv.id = msg.conversationId
+        conv.lastMessagePreview = msg.content
+        conv.lastMessageAt = msg.createdAt
+        messages.value.push(msg)
+      }
+    } else {
+      // 已有会话：即时追加气泡，本地更新预览/时间
+      messages.value.push(msg)
+      conv.lastMessagePreview = msg.content
+      conv.lastMessageAt = msg.createdAt
+    }
     await scrollToBottom()
   } catch (e: unknown) {
-    ElMessage.error((e as { message?: string })?.message || '发送失败')
+    ElMessage.error((e as Error).message || '发送失败')
   } finally {
     sending.value = false
+  }
+}
+
+/** 刷新左栏会话列表（首条消息发送后把新建会话合并进来），不改动当前激活态 */
+async function refreshConversationList() {
+  try {
+    const res = await getConversations(1, 50)
+    conversations.value = res.data ?? []
+  } catch {
+    // 刷新失败不影响已发送的消息
   }
 }
 

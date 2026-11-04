@@ -3873,6 +3873,7 @@ Authorization: Bearer {accessToken}
 - **幂等**：已存在会话（含对方已隐藏后重新出现）则返回既有会话，不重复创建
 - 若会话曾被对方隐藏（`peer` 侧 `hidden=1`），再次发起时后端应将对方的 `hidden` 标志重置为 0（对方重新看到会话）
 - 新建会话时 `user_a_id`/`user_b_id` 由后端按 `min(userId)`/`max(userId)` 排序写入，满足 `ck_conversations_order` 约束
+- **前端已不在点击「私信」时调用本接口**：会话创建推迟到「首条消息发送」时由 `addMessage`（接口 4 / WS `send`）内部的 `createMessage` 完成。本接口保留作工具/兜底用，前端点击入口仅 `router.push('/messages?userId=…&nick=…&avatar=…')` 进入草稿态
 
 ---
 
@@ -4125,14 +4126,15 @@ Authorization: Bearer {accessToken}
 | 位置 | 接口 | 交互 |
 |------|------|------|
 | Header 铃铛「私信」入口 / `/messages?tab=message` | `GET /messages/conversations` | 会话列表（头像 + 昵称 + 最后消息摘要 + 未读角标 + 时间） |
-| 用户头像旁「私信」按钮（文章详情/评论区等） | `GET /messages/conversations/with/{userId}` 初始化 → `router.push('/messages?userId={peerId}')` | 未登录点击 → 弹登录框；看自己不展示按钮 |
-| `/messages?userId={peerId}` 选中会话 | `GET /messages/conversations/{conversationId}/messages` | 气泡聊天窗，按时间倒序分页加载 |
-| 发送消息 | `POST /messages` | 成功后本地追加气泡，更新会话列表 `lastMessagePreview`/`lastMessageAt` |
+| 用户头像旁「私信」按钮（文章详情/评论区等） | 仅 `router.push('/messages?userId={peerId}&nick=…&avatar=…')`，**不调接口** | 未登录点击 → 弹登录框；看自己不展示按钮。进入草稿态，会话在首条消息发送时才创建 |
+| `/messages?userId={peerId}` 选中会话 | `GET /messages/conversations/{conversationId}/messages` | 气泡聊天窗，按时间倒序分页加载。草稿态（`id=0`）不拉取 |
+| 发送消息 | WebSocket `{type:"send"}` | 等 `send_ack` 回执追加气泡；草稿态下拿到真实 `conversationId` 后刷新左栏列表并选中真实会话。REST `POST /messages` 保留作兜底 |
 | 打开会话/切换会话 | `PUT /messages/conversations/{conversationId}/read` | 清零该会话未读（乐观清角标），随后刷新 `GET /messages/unread-count` 同步铃铛「私信」角标 |
 | 删除会话 | `DELETE /messages/conversations/{conversationId}` | `ElMessageBox.confirm` 确认后本地移除行，删除后刷新 `GET /messages/unread-count` |
 | Header 铃铛「私信」角标 | `GET /messages/unread-count` | 私信未读总数（登录时拉取，登出清空）；与通知 `byType` 无关 |
+| 对方实时发来的新消息 | WebSocket `{type:"message"}` 推送 | 在线时服务端主动推；未读角标 +1，正看该会话则追加气泡 + 标记已读，否则弹桌面通知 |
 
-**实时性**：一期不做 WebSocket 推送；Header 登录时拉一次 `GET /messages/unread-count`，`/messages` 页在标记已读 / 删除会话后主动刷新该值即可。后续可接入 `NotificationWebSocketHandler` 做实时推送。
+**实时性**：已接入 WebSocket（`/ws/messages`，协议见上文）。Header 登录时建立连接并拉一次 `GET /messages/unread-count`；`/messages` 页在标记已读 / 删除会话后主动刷新该值。断线指数退避重连，握手失败（access token 过期）先刷新再重连。
 
 **XSS**：`content` 为纯文本，前端渲染时必须转义或用 `<text>`/纯文本节点展示，禁止 `v-html`。
 

@@ -31,6 +31,13 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
         },
+        // 私信 WebSocket：dev 下走 vite 代理转发到后端（ws:true 启用 WebSocket 升级）
+        '/ws': {
+          target: proxyTarget,
+          changeOrigin: true,
+          secure: false,
+          ws: true,
+        },
       },
     },
   }

@@ -152,11 +152,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
+import { useMessageWsStore } from '@/stores/messageWs'
 import { ElMessage } from 'element-plus'
 import {
   ArrowDown,
@@ -175,6 +176,7 @@ import {
 const router = useRouter()
 const authStore = useAuthStore()
 const notifStore = useNotificationStore()
+const wsStore = useMessageWsStore()
 const { isLoggedIn, isAdmin, user, showLoginModal } = storeToRefs(authStore)
 
 // ---- 站内通知铃铛 ----
@@ -199,25 +201,25 @@ function goNotifications(key: string = 'comment') {
   router.push({ name: 'Notifications', query: { tab: key } })
 }
 
-// 进入页面拉一次未读数（通知 + 私信，登录态恢复后）；登出时清空
-onMounted(async () => {
-  if (isLoggedIn.value) {
-    await Promise.all([
-      notifStore.fetchUnreadCount(),
-      notifStore.fetchMessageUnread(),
-    ])
-  }
-})
-watch(isLoggedIn, async (val: boolean) => {
-  if (val) {
-    await Promise.all([
-      notifStore.fetchUnreadCount(),
-      notifStore.fetchMessageUnread(),
-    ])
-  } else {
-    notifStore.clear()
-  }
-})
+// 登录态变化（含首次恢复）：拉未读 + 建立/断开私信 WS。
+// immediate 覆盖「刷新页面后 token 在、user 异步恢复」的恢复场景：
+// 此时 isLoggedIn 先 false（user 未拉回）→ true 触发连接。
+watch(
+  isLoggedIn,
+  async (val: boolean) => {
+    if (val) {
+      await Promise.all([
+        notifStore.fetchUnreadCount(),
+        notifStore.fetchMessageUnread(),
+      ])
+      wsStore.connect()
+    } else {
+      wsStore.disconnect()
+      notifStore.clear()
+    }
+  },
+  { immediate: true }
+)
 
 const handleCommand = (command: string) => {
   switch (command) {
