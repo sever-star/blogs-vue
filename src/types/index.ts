@@ -72,6 +72,10 @@ export interface ArticleListItem {
   tags: Tag[]
   authorNickname: string
   authorAvatar: string
+  /** 搜索命中高亮标题（仅 GET /posts/search 返回，<em> 包裹命中词；为空时用 title） */
+  highlightTitle?: string
+  /** 搜索命中高亮摘要片段（仅 GET /posts/search 返回；为空时用 summary） */
+  highlightSummary?: string
 }
 
 /** 文章详情（含正文） */

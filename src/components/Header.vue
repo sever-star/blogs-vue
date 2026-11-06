@@ -17,6 +17,20 @@
         <!-- AI assistant link (open to guests as well) -->
         <router-link to="/ai" class="nav-link">AI 助手</router-link>
 
+        <!-- 全局搜索框：回车或点按钮触发，关键词写入 URL query 由 Home 监听执行搜索 -->
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索文章…"
+          class="header-search"
+          clearable
+          @keyup.enter="handleSearch"
+          @clear="handleSearch"
+        >
+          <template #append>
+            <el-button :icon="Search" @click="handleSearch" />
+          </template>
+        </el-input>
+
         <!-- Write article link (only when logged in) -->
         <router-link
           v-if="isLoggedIn"
@@ -152,8 +166,8 @@
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { watch, ref } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
@@ -171,13 +185,40 @@ import {
   Star,
   Message,
   InfoFilled,
+  Search,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const notifStore = useNotificationStore()
 const wsStore = useMessageWsStore()
 const { isLoggedIn, isAdmin, user, showLoginModal } = storeToRefs(authStore)
+
+// ---- 全局搜索 ----
+// 搜索词由 URL ?q= 驱动：Header 只负责写入 query，Home watch query 后调 store 搜索。
+// 这样刷新/分享链接都能保留搜索态，Header 与列表解耦。
+const searchKeyword = ref<string>((route.query.q as string) || '')
+
+/** 回车/点按钮/清空时触发：空词跳回无 query 首页（退出搜索），有词跳带 q 的首页 */
+function handleSearch() {
+  const kw = searchKeyword.value.trim()
+  if (!kw) {
+    if (route.name === 'Home' && route.query.q) {
+      router.push({ name: 'Home' })
+    }
+    return
+  }
+  router.push({ name: 'Home', query: { q: kw } })
+}
+
+// URL 里的 q 变了（如点 Logo 回首页、或外部带链接进入）→ 同步回输入框
+watch(
+  () => route.query.q,
+  (q: unknown) => {
+    searchKeyword.value = (q as string) || ''
+  }
+)
 
 // ---- 站内通知铃铛 ----
 
@@ -319,6 +360,15 @@ const handleCommand = (command: string) => {
   color: #3b82f6;
   border-bottom: 2px solid #3b82f6;
   padding-bottom: 2px;
+}
+
+/* 全局搜索框：宽度固定，避免输入时挤压导航项 */
+.header-search {
+  width: 240px;
+}
+
+.header-search :deep(.el-input-group__append) {
+  padding: 0 10px;
 }
 
 .auth-section {
@@ -464,6 +514,10 @@ const handleCommand = (command: string) => {
 
   .nav-section {
     gap: 16px;
+  }
+
+  .header-search {
+    width: 130px;
   }
 
   .user-nickname {

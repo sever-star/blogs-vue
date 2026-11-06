@@ -3,10 +3,18 @@
     <div class="card-content">
       <!-- 新标签页打开：普通 a + target=_blank（router-link 会拦截成当前页路由跳转） -->
       <a :href="articleHref" target="_blank" rel="noopener" class="title-link">
-        <h2 class="article-title">{{ article.title }}</h2>
+        <!-- 搜索结果带 highlightTitle（后端 ts_headline 生成 <em> 包裹命中词）：
+             v-html 渲染前先清理，仅放行 <em>，其余 HTML 全部转义，防止 XSS -->
+        <h2 v-if="article.highlightTitle" class="article-title" v-html="sanitizeHighlight(article.highlightTitle)" />
+        <h2 v-else class="article-title">{{ article.title }}</h2>
       </a>
 
-      <p class="article-excerpt">{{ article.summary }}</p>
+      <p
+        v-if="article.highlightSummary"
+        class="article-excerpt"
+        v-html="sanitizeHighlight(article.highlightSummary)"
+      />
+      <p v-else class="article-excerpt">{{ article.summary }}</p>
 
       <!-- 分类 + 时间 + 用户合并为一行（此前拆成两个 meta 块，时间/用户重复渲染了两次） -->
       <div class="article-meta">
@@ -100,6 +108,20 @@ function formatDate(dateString: string): string {
     day: '2-digit',
   })
 }
+
+/**
+ * 清理后端搜索高亮 HTML：先转义全部 < > &，再把后端 ts_headline 生成的
+ * <em>...</em> 还原为真实标签。最终只有 <em> 可执行，其余 HTML 一律以字面量显示，
+ * 杜绝把用户输入的标题/摘要里的脚本注入页面（XSS）。
+ */
+function sanitizeHighlight(html: string): string {
+  return html
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/&lt;em&gt;/g, '<em>')
+    .replace(/&lt;\/em&gt;/g, '</em>')
+}
 </script>
 
 <style scoped>
@@ -153,6 +175,17 @@ function formatDate(dateString: string): string {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* 搜索命中高亮：后端 ts_headline 用 <em> 包裹命中词（v-html 注入，需 :deep 穿透 scoped） */
+.article-title :deep(em),
+.article-excerpt :deep(em) {
+  color: #f56c6c;
+  font-style: normal;
+  font-weight: 600;
+  background: rgba(245, 108, 108, 0.12);
+  border-radius: 2px;
+  padding: 0 2px;
 }
 
 .article-meta {

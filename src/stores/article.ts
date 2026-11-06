@@ -18,6 +18,7 @@ import {
   favoriteArticle as favoriteArticleApi,
   unfavoriteArticle as unfavoriteArticleApi,
   getTopArticles as getTopArticlesApi,
+  searchArticles as searchArticlesApi,
 } from '@/api/article'
 import type { ArticleQueryParams, ArticlePayload } from '@/types'
 
@@ -35,6 +36,14 @@ export const useArticleStore = defineStore('article', () => {
   const totalCount = ref(0)
   const totalPages = ref(0)
   const loading = ref(false)
+
+  // ========== 搜索 ==========
+  /** 当前搜索关键词（非空表示处于搜索结果模式；Home 据此切换列表数据源） */
+  const searchKeyword = ref<string>('')
+  /** 搜索结果（按相关性排序，含高亮字段；不分页） */
+  const searchResults = ref<ArticleListItem[]>([])
+  /** 搜索请求进行中（独立于列表 loading，避免互相干扰） */
+  const searching = ref(false)
 
   // ========== Mock 数据 (开发阶段使用) ==========
 
@@ -405,6 +414,36 @@ export const useArticleStore = defineStore('article', () => {
     }
   }
 
+  /** 退出搜索模式：清空关键词与结果，回到普通列表 */
+  const clearSearch = () => {
+    searchKeyword.value = ''
+    searchResults.value = []
+  }
+
+  /**
+   * 搜索文章：GET /posts/search?keyword=
+   * 关键词为空等价于 clearSearch（退出搜索模式回到普通列表）。
+   * 后端返回全量结果含高亮字段，前端不分页；搜索模式下隐藏无限滚动。
+   */
+  const searchArticles = async (keyword: string) => {
+    const kw = keyword.trim()
+    if (!kw) {
+      clearSearch()
+      return
+    }
+    searching.value = true
+    searchKeyword.value = kw
+    try {
+      searchResults.value = await searchArticlesApi(kw)
+    } catch (error) {
+      console.error('搜索文章失败:', error)
+      searchResults.value = []
+      throw error
+    } finally {
+      searching.value = false
+    }
+  }
+
   return {
     articles,
     tags,
@@ -421,6 +460,9 @@ export const useArticleStore = defineStore('article', () => {
     topViewedArticles,
     pendingArticles,
     loading,
+    searchKeyword,
+    searchResults,
+    searching,
     fetchTags,
     fetchCategories,
     fetchArticles,
@@ -439,5 +481,7 @@ export const useArticleStore = defineStore('article', () => {
     unfavoriteArticle,
     resetSelection,
     loadMore,
+    searchArticles,
+    clearSearch,
   }
 })

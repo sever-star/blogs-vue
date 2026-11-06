@@ -28,6 +28,17 @@ export const getArticles = async (params?: ArticleQueryParams): Promise<ArticleL
 }
 
 /**
+ * 搜索文章（PostgreSQL 全文检索，按相关性排序）
+ * GET /posts/search?keyword=
+ * 后端用 ts_headline 生成高亮：highlightTitle / highlightSummary 以 <em> 包裹命中词，
+ * 仅此接口返回；普通列表项这两个字段为空（后端 @JsonInclude(NON_NULL) 不序列化）。
+ * 不分页，全量返回，前端自行渲染。
+ */
+export const searchArticles = async (keyword: string): Promise<ArticleListItem[]> => {
+  return client.get('/posts/search', { params: { keyword } })
+}
+
+/**
  * 获取浏览量排行（按 viewCount 降序，返回前 N 条）
  * GET /posts/top?limit=10
  * limit 由后端 SQL LIMIT 截断，默认 10

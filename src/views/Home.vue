@@ -3,8 +3,8 @@
     <div class="home-container">
       <!-- 左栏：标签 + 文章列表 -->
       <div class="main-column">
-        <!-- 分类选择栏 -->
-        <div class="category-section">
+        <!-- 分类选择栏（搜索模式下隐藏：搜索结果不受分类/标签筛选影响） -->
+        <div v-if="!isSearching" class="category-section">
           <div class="category-tabs-wrapper">
             <div
               ref="categoryTabsRef"
@@ -67,35 +67,68 @@
 
         <!-- 文章列表 -->
         <div class="articles-section">
-          <div v-if="articleStore.loading && articleStore.paginatedArticles.length === 0" class="loading">
-            <el-skeleton :rows="5" animated />
-          </div>
+          <!-- 搜索结果模式 -->
+          <template v-if="isSearching">
+            <div class="search-header">
+              <span class="search-summary">
+                搜索「<strong>{{ articleStore.searchKeyword }}</strong>」
+                <span v-if="!articleStore.searching" class="search-count">
+                  共 {{ articleStore.searchResults.length }} 篇
+                </span>
+              </span>
+              <el-button text type="primary" @click="clearSearch">清除搜索</el-button>
+            </div>
 
-          <div v-else-if="articleStore.paginatedArticles.length === 0" class="no-articles">
-            <el-empty description="暂无文章" />
-          </div>
+            <div v-if="articleStore.searching" class="loading">
+              <el-skeleton :rows="5" animated />
+            </div>
 
-          <div v-else class="articles-list">
-            <ArticleCard
-              v-for="article in articleStore.paginatedArticles"
-              :key="article.id"
-              :article="article"
-              @tag-click="handleArticleTagClick"
-            />
-          </div>
+            <div v-else-if="articleStore.searchResults.length === 0" class="no-articles">
+              <el-empty description="没有找到相关文章" />
+            </div>
 
-          <!-- 加载更多 -->
-          <div v-if="articleStore.hasMore" class="load-more">
-            <el-button @click="handleLoadMore" :loading="articleStore.loading">加载更多</el-button>
-          </div>
+            <div v-else class="articles-list">
+              <ArticleCard
+                v-for="article in articleStore.searchResults"
+                :key="article.id"
+                :article="article"
+                @tag-click="handleArticleTagClick"
+              />
+            </div>
+          </template>
 
-          <!-- 无限滚动触发器 -->
-          <div v-if="!articleStore.loading" ref="scrollTrigger" class="scroll-trigger"></div>
+          <!-- 普通列表模式 -->
+          <template v-else>
+            <div v-if="articleStore.loading && articleStore.paginatedArticles.length === 0" class="loading">
+              <el-skeleton :rows="5" animated />
+            </div>
+
+            <div v-else-if="articleStore.paginatedArticles.length === 0" class="no-articles">
+              <el-empty description="暂无文章" />
+            </div>
+
+            <div v-else class="articles-list">
+              <ArticleCard
+                v-for="article in articleStore.paginatedArticles"
+                :key="article.id"
+                :article="article"
+                @tag-click="handleArticleTagClick"
+              />
+            </div>
+
+            <!-- 加载更多 -->
+            <div v-if="articleStore.hasMore" class="load-more">
+              <el-button @click="handleLoadMore" :loading="articleStore.loading">加载更多</el-button>
+            </div>
+
+            <!-- 无限滚动触发器 -->
+            <div v-if="!articleStore.loading" ref="scrollTrigger" class="scroll-trigger"></div>
+          </template>
         </div>
       </div>
 
-      <!-- 右栏：浏览量排行（仅「全部」时显示） -->
-      <aside v-if="articleStore.selectedTag === null" class="ranking-sidebar">
+      <!-- 右栏：浏览量排行（仅「全部」且非搜索时显示） -->
+      <aside v-if="articleStore.selectedTag === null && !isSearching" class="ranking-sidebar">
         <el-card shadow="never" class="ranking-card">
           <template #header>
             <span class="ranking-title">热门排行</span>
@@ -122,7 +155,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useArticleStore } from '@/stores/article'
 import { ElMessage } from 'element-plus'
 import ArticleCard from '@/components/ArticleCard.vue'
@@ -130,6 +163,35 @@ import { Document, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 
 const articleStore = useArticleStore()
 const router = useRouter()
+const route = useRoute()
+
+/** 是否处于搜索结果模式（store.searchKeyword 非空） */
+const isSearching = computed(() => !!articleStore.searchKeyword)
+
+/** URL ?q= 驱动搜索：有值调 store 搜索，无值退出搜索回到普通列表。
+ *  immediate 覆盖刷新/外链带 q 进入的场景；Header 写入 q 后此处响应执行 */
+watch(
+  () => route.query.q,
+  async (q: unknown) => {
+    const kw = (q as string) || ''
+    if (!kw) {
+      articleStore.clearSearch()
+      return
+    }
+    try {
+      await articleStore.searchArticles(kw)
+    } catch {
+      ElMessage.error('搜索失败，请稍后重试')
+    }
+  },
+  { immediate: true }
+)
+
+/** 退出搜索：清 store + 去掉 URL 里的 q（watch 会再 clearSearch 一次，幂等） */
+function clearSearch() {
+  articleStore.clearSearch()
+  router.push({ name: 'Home' })
+}
 
 /** 点击热门排行项 → 打开文章详情（同标签页跳转，与侧栏「点进去读」的直觉一致） */
 function openArticle(id: number) {
@@ -256,8 +318,13 @@ async function handleTagClick(tagId: number | null) {
 
 // 从文章卡片点击标签
 function handleArticleTagClick(tagName: string) {
-  const tag = articleStore.tags.find(t => t.name === tagName)
+  const tag = articleStore.tags.find((t) => t.name === tagName)
   if (tag) {
+    // 搜索模式下点标签：先退出搜索回到普通列表，再应用标签筛选
+    if (isSearching.value) {
+      articleStore.clearSearch()
+      router.push({ name: 'Home' })
+    }
     handleTagClick(tag.id)
   }
 }
@@ -377,6 +444,32 @@ function handleLoadMore() {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* 搜索结果头部：关键词 + 命中数 + 清除按钮 */
+.search-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: white;
+  border-radius: 8px;
+  padding: 14px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.search-summary {
+  font-size: 15px;
+  color: #4b5563;
+}
+
+.search-summary strong {
+  color: #1f2937;
+}
+
+.search-count {
+  margin-left: 8px;
+  font-size: 13px;
+  color: #9ca3af;
 }
 
 .loading {

@@ -3058,7 +3058,69 @@ GET /posts/top?limit=10
 
 ---
 
-### 10. 我的文章（含草稿）
+### 10. 搜索文章（全文检索）
+
+**请求**
+
+```
+GET /posts/search?keyword=Vue3
+```
+
+**Query 参数**
+| 参数 | 类型 | 必需 | 说明 |
+|-----|------|------|------|
+| keyword | string | 是 | 搜索关键词；空白时返回 400 |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": [
+    {
+      "id": 1,
+      "userId": 2,
+      "title": "Vue3 Composition API 完全指南",
+      "summary": "深入学习 Vue3 的 Composition API...",
+      "coverImage": "https://...",
+      "viewCount": 1250,
+      "likeCount": 36,
+      "favCount": 12,
+      "status": 1,
+      "createdAt": "2024-...",
+      "updatedAt": "2024-...",
+      "category": { "id": 1, "name": "技术" },
+      "tags": [{ "id": 1, "name": "Vue3", "createdAt": "..." }],
+      "authorNickname": "张三",
+      "authorAvatar": "https://...",
+      "highlightTitle": "Vue3 Composition API 完全指南",
+      "highlightSummary": "深入学习 <em>Vue3</em> 的 Composition API..."
+    }
+  ]
+}
+```
+
+**错误情况**
+
+| 状态码 | 说明 |
+|-------|------|
+| 400 | `keyword` 为空或全空白 |
+
+**备注**
+
+- 不需要认证（公开接口）
+- 已实现：`GET /posts/search`，基于 PostgreSQL 全文检索（`search_vector @@ websearch_to_tsquery('zhprs', keyword)`），支持中文分词
+- 按 `ts_rank` 相关性降序、再按 `updatedAt` 降序排序
+- 仅返回已发布（status=1）且未软删的文章
+- 不分页，全量返回；前端自行渲染
+- `highlightTitle` / `highlightSummary` 由 `ts_headline` 生成，命中词以 `<em>…</em>` 包裹，**仅此接口返回**（`PostResponse` 标注 `@JsonInclude(NON_NULL)`，普通列表接口不序列化这两个字段）
+- 前端用 `v-html` 渲染高亮前需清理：仅放行 `<em>`，其余 HTML 转义，防止 XSS
+- 关联 `category`、`tags`、`authorNickname`/`authorAvatar` 一并返回，可直接复用 `ArticleCard` 渲染
+
+---
+
+### 11. 我的文章（含草稿）
 
 **请求**
 
