@@ -76,6 +76,18 @@
                     <span class="following-username">@{{ u.username }}</span>
                     <span v-if="u.bio" class="following-bio">{{ u.bio }}</span>
                   </div>
+                  <div v-if="!isSelf(u)" class="following-actions">
+                    <el-button
+                      size="small"
+                      :type="followOf(u).followed ? 'info' : 'primary'"
+                      :plain="!followOf(u).followed"
+                      :loading="followOf(u).loading"
+                      @click="toggleFollow(u)"
+                    >
+                      {{ followOf(u).followed ? '已关注' : '关注' }}
+                    </el-button>
+                    <el-button size="small" plain @click="handleMessage(u)">私信</el-button>
+                  </div>
                 </div>
               </div>
             </el-tab-pane>
@@ -97,6 +109,18 @@
                     <span class="following-username">@{{ u.username }}</span>
                     <span v-if="u.bio" class="following-bio">{{ u.bio }}</span>
                   </div>
+                  <div v-if="!isSelf(u)" class="following-actions">
+                    <el-button
+                      size="small"
+                      :type="followOf(u).followed ? 'info' : 'primary'"
+                      :plain="!followOf(u).followed"
+                      :loading="followOf(u).loading"
+                      @click="toggleFollow(u)"
+                    >
+                      {{ followOf(u).followed ? '已关注' : '关注' }}
+                    </el-button>
+                    <el-button size="small" plain @click="handleMessage(u)">私信</el-button>
+                  </div>
                 </div>
               </div>
             </el-tab-pane>
@@ -108,13 +132,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { getLikedArticles } from '@/api/article'
-import { getFollowing, getFollowers } from '@/api/follow'
+import { getFollowing, getFollowers, followUser, unfollowUser, getFollowStatus } from '@/api/follow'
 import { getUserStats, type UserStats } from '@/api/user'
 import type { ArticleListItem, User } from '@/types'
 import ArticleCard from '@/components/ArticleCard.vue'
@@ -185,7 +209,12 @@ async function loadFollowing() {
   followingLoading.value = true
   followingError.value = ''
   try {
-    followingUsers.value = await getFollowing()
+    const list = await getFollowing()
+    followingUsers.value = list
+    // 关注列表里的都是当前用户已关注的人，直接置为已关注
+    list.forEach((u) => {
+      followOf(u).followed = true
+    })
     followingLoaded.value = true
   } catch (e: any) {
     followingError.value = e?.message || '加载失败，请稍后重试'
@@ -206,14 +235,97 @@ async function loadFollowers() {
   followersLoading.value = true
   followersError.value = ''
   try {
-    followerUsers.value = await getFollowers(user.value.id)
+    const list = await getFollowers(user.value.id)
+    followerUsers.value = list
     followersLoaded.value = true
+    // 粉丝列表关注状态未知：对非自己的每个粉丝并发查一次关注状态
+    list.forEach((u) => {
+      if (isSelf(u)) return
+      // 先初始化为未关注，避免按钮闪烁
+      followOf(u).followed = false
+      getFollowStatus(u.id)
+        .then((ok) => {
+          followOf(u).followed = ok
+        })
+        .catch(() => {
+          // 状态查询失败不打扰用户，按钮保持「关注」
+        })
+    })
   } catch (e: any) {
     followersError.value = e?.message || '加载失败，请稍后重试'
     ElMessage.error(followersError.value)
   } finally {
     followersLoading.value = false
   }
+}
+
+// ---- 列表行内：关注 / 私信 ----
+// 每个用户的关注按钮状态：followed=是否已关注，loading=操作中
+const followState = reactive<Record<number, { followed: boolean; loading: boolean }>>({})
+
+/** 取/初始化某用户的关注状态对象（reactive，模板可直接读） */
+function followOf(u: User): { followed: boolean; loading: boolean } {
+  if (!followState[u.id]) {
+    followState[u.id] = { followed: false, loading: false }
+  }
+  return followState[u.id]
+}
+
+/** 是否是当前登录用户自己（自己不展示关注/私信按钮） */
+function isSelf(u: User): boolean {
+  return u.id === user.value?.id
+}
+
+/** 切换关注/取消关注 */
+async function toggleFollow(u: User) {
+  if (!authStore.isLoggedIn) {
+    authStore.openLoginModal('login')
+    return
+  }
+  if (isSelf(u)) return
+  const st = followOf(u)
+  st.loading = true
+  try {
+    if (st.followed) {
+      await unfollowUser(u.id)
+      st.followed = false
+      ElMessage.success('已取消关注')
+    } else {
+      await followUser(u.id)
+      st.followed = true
+      ElMessage.success('已关注')
+    }
+  } catch (error) {
+    ElMessage.error(errorText(error, st.followed ? '取消关注失败' : '关注失败'))
+  } finally {
+    st.loading = false
+  }
+}
+
+/** 发起私信：带 userId + 昵称 + 头像进入私信页草稿态，首条消息发送时才创建会话 */
+function handleMessage(u: User) {
+  if (!authStore.isLoggedIn) {
+    authStore.openLoginModal('login')
+    return
+  }
+  if (isSelf(u)) return
+  router.push({
+    path: '/messages',
+    query: {
+      userId: u.id,
+      nick: u.nickname || u.username || '',
+      avatar: u.avatar || '',
+    },
+  })
+}
+
+function errorText(error: unknown, fallback: string): string {
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = String((error as { message?: unknown }).message ?? '')
+    if (message) return message
+  }
+  if (typeof error === 'string' && error) return error
+  return fallback
 }
 
 function formatDate(date?: string | null): string {
@@ -349,6 +461,15 @@ onMounted(() => {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1;
+}
+
+/* 关注/私信按钮行：贴行右缘，两枚紧凑按钮 */
+.following-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: 12px;
 }
 
 .following-nickname {
