@@ -103,6 +103,10 @@
 
           <!-- 操作 -->
           <div class="row-actions">
+            <el-button size="small" @click="openRevisions(article)">
+              <el-icon style="margin-right: 4px"><Clock /></el-icon>
+              历史版本
+            </el-button>
             <el-button size="small" @click="router.push(`/write/${article.id}`)">
               <el-icon style="margin-right: 4px"><Edit /></el-icon>
               编辑
@@ -121,6 +125,109 @@
         </div>
       </div>
     </div>
+
+    <!-- 历史版本抽屉 -->
+    <el-drawer
+      v-model="revisionsVisible"
+      :size="revisionDrawerSize"
+      :title="revisionTitle"
+      destroy-on-close
+      class="revisions-drawer"
+    >
+      <!-- 加载中 -->
+      <div v-if="revisionLoading" class="revision-loading">
+        <el-skeleton :rows="6" animated />
+      </div>
+
+      <!-- 加载失败 -->
+      <el-empty v-else-if="revisionLoadError" :description="revisionLoadError">
+        <el-button type="primary" size="small" @click="loadRevisions">重试</el-button>
+      </el-empty>
+
+      <!-- 版本时间线（列表视图） -->
+      <template v-else-if="revisionView === 'list' || revisions.length === 0">
+        <div v-if="revisions.length === 0" class="revision-empty">
+          <el-empty description="暂无历史版本">
+            <p class="revision-empty-tip">每次编辑保存都会自动生成一条历史快照</p>
+          </el-empty>
+        </div>
+
+        <el-timeline v-else class="revision-timeline">
+          <!-- 顶部「当前版本」：取文章实时数据，非快照行，不可回滚 -->
+          <el-timeline-item
+            v-if="revisionArticle"
+            :timestamp="formatDateTime(revisionArticle.updatedAt || revisionArticle.createdAt)"
+            placement="top"
+            type="primary"
+            class="current-version-item"
+          >
+            <div class="timeline-entry current-entry">
+              <div class="entry-head">
+                <span class="entry-version">当前版本</span>
+                <el-tag type="primary" size="small" effect="plain">最新状态</el-tag>
+              </div>
+              <div class="entry-note">当前未归档的编辑状态（存于文章本体，不在历史中）</div>
+              <div class="entry-meta">{{ revisionArticle.authorNickname || '我' }} · {{ statusMeta(revisionArticle.status).label }}</div>
+            </div>
+          </el-timeline-item>
+
+          <el-timeline-item
+            v-for="rev in revisions"
+            :key="rev.id"
+            :timestamp="formatDateTime(rev.editedAt)"
+            placement="top"
+            :type="timelineType(rev)"
+            class="revision-item"
+          >
+            <div class="timeline-entry" @click="openRevisionDetail(rev)">
+              <div class="entry-head">
+                <span class="entry-version">版本 {{ rev.versionNo }}</span>
+                <span v-if="rev.changeNote" class="entry-note-tag">{{ rev.changeNote }}</span>
+              </div>
+              <div class="entry-meta">{{ rev.editedByName || '我' }} 于 {{ formatDateTime(rev.editedAt) }}</div>
+            </div>
+          </el-timeline-item>
+        </el-timeline>
+      </template>
+
+      <!-- 单版本预览（详情视图） -->
+      <template v-else-if="revisionView === 'detail' && currentRevision">
+        <el-button link type="primary" class="back-btn" @click="revisionView = 'list'">
+          <el-icon style="margin-right: 2px"><ArrowLeft /></el-icon>
+          返回版本列表
+        </el-button>
+
+        <div class="revision-detail">
+          <div class="detail-head">
+            <h3 class="detail-title">{{ currentRevision.title || '（无标题）' }}</h3>
+            <div class="detail-meta">
+              <el-tag size="small" type="info" effect="plain">版本 {{ currentRevision.versionNo }}</el-tag>
+              <span>{{ currentRevision.editedByName || '我' }} · {{ formatDateTime(currentRevision.editedAt) }}</span>
+              <span v-if="currentRevision.changeNote" class="detail-note">备注：{{ currentRevision.changeNote }}</span>
+            </div>
+            <img
+              v-if="currentRevision.coverImage"
+              :src="currentRevision.coverImage"
+              alt="封面"
+              class="detail-cover"
+            />
+            <p v-if="currentRevision.summary" class="detail-summary">{{ currentRevision.summary }}</p>
+          </div>
+
+          <div class="detail-content markdown-body">
+            <MDPreview v-if="currentRevision.contentMd" :model-value="currentRevision.contentMd" preview-only />
+            <el-empty v-else description="该版本无正文内容" :image-size="60" />
+          </div>
+
+          <div class="detail-actions">
+            <el-button type="primary" :loading="rollbacking" @click="handleRollback">
+              回滚到此版本
+            </el-button>
+            <span class="rollback-tip">回滚后需经管理员重新审核才能再发布</span>
+          </div>
+        </div>
+      </template>
+    </el-drawer>
   </main>
 </template>
 
@@ -128,9 +235,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Calendar, View, Star, Folder } from '@element-plus/icons-vue'
-import { getMyArticles, offlineArticle } from '@/api/article'
-import type { ArticleListItem } from '@/types'
+import { Edit, Calendar, View, Star, Folder, Clock, ArrowLeft } from '@element-plus/icons-vue'
+import { getMyArticles, offlineArticle, getPostRevisions, getPostRevision, rollbackPostRevision } from '@/api/article'
+import type { ArticleListItem, PostRevision, PostRevisionListItem } from '@/types'
+import { MdPreview as MDPreview } from 'md-editor-v3'
+import 'md-editor-v3/lib/preview.css'
 
 const router = useRouter()
 
@@ -250,6 +359,110 @@ function formatDate(dateString?: string | null): string {
     month: '2-digit',
     day: '2-digit',
   })
+}
+
+/** 格式化到分钟，用于版本时间线展示 */
+function formatDateTime(dateString?: string | null): string {
+  if (!dateString) return '—'
+  const d = new Date(dateString)
+  if (Number.isNaN(d.getTime())) return dateString
+  return d.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+// ==================== 历史版本 ====================
+
+const revisionsVisible = ref(false)
+const revisionLoading = ref(false)
+const revisionLoadError = ref('')
+const revisions = ref<PostRevisionListItem[]>([])
+const currentRevision = ref<PostRevision | null>(null)
+const revisionArticle = ref<ArticleListItem | null>(null)
+const revisionView = ref<'list' | 'detail'>('list')
+const rollbacking = ref(false)
+
+const revisionDrawerSize = computed(() =>
+  revisionView.value === 'detail' ? 'min(680px, 92vw)' : 'min(480px, 92vw)'
+)
+
+const revisionTitle = computed(() =>
+  revisionArticle.value ? `历史版本 · ${revisionArticle.value.title}` : '历史版本'
+)
+
+/** 打开某篇文章的版本抽屉，拉取版本列表 */
+async function openRevisions(article: ArticleListItem) {
+  revisionArticle.value = article
+  revisionView.value = 'list'
+  currentRevision.value = null
+  revisionsVisible.value = true
+  await loadRevisions()
+}
+
+async function loadRevisions() {
+  if (!revisionArticle.value) return
+  revisionLoading.value = true
+  revisionLoadError.value = ''
+  try {
+    revisions.value = await getPostRevisions(revisionArticle.value.id)
+  } catch (e: any) {
+    revisionLoadError.value = e?.message || '加载版本列表失败，请重试'
+    ElMessage.error(revisionLoadError.value)
+  } finally {
+    revisionLoading.value = false
+  }
+}
+
+/** 点某版本 → 拉完整快照并切到预览视图 */
+async function openRevisionDetail(rev: PostRevisionListItem) {
+  if (!revisionArticle.value) return
+  try {
+    currentRevision.value = await getPostRevision(revisionArticle.value.id, rev.id)
+    revisionView.value = 'detail'
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载版本内容失败，请重试')
+  }
+}
+
+/** 回滚：二次确认 → 调用接口 → 关闭抽屉并刷新列表 */
+async function handleRollback() {
+  if (!revisionArticle.value || !currentRevision.value) return
+  const targetVersion = currentRevision.value.versionNo
+  try {
+    await ElMessageBox.confirm(
+      `确认回滚到版本 ${targetVersion}？回滚后文章将进入待审核状态（已发布文章会先下架），需重新审核才能再次发布。回滚前状态会自动保存为一个新版本，可随时撤销。`,
+      '回滚文章',
+      {
+        type: 'warning',
+        confirmButtonText: '确认回滚',
+        cancelButtonText: '取消',
+        confirmButtonClass: 'el-button--danger',
+      }
+    )
+  } catch {
+    return // 用户取消
+  }
+
+  rollbacking.value = true
+  try {
+    await rollbackPostRevision(revisionArticle.value.id, currentRevision.value.id)
+    ElMessage.success(`已回滚到版本 ${targetVersion}`)
+    revisionsVisible.value = false
+    await load() // 刷新列表（回滚后已发布文章 status 变 2，审核状态归 0）
+  } catch (e: any) {
+    ElMessage.error(e?.message || '回滚失败，请重试')
+  } finally {
+    rollbacking.value = false
+  }
+}
+
+/** 是否为回滚触发的自动快照（change_note 前缀识别） */
+function timelineType(rev: PostRevisionListItem) {
+  return rev.changeNote?.includes('回滚') ? 'warning' : undefined
 }
 
 onMounted(load)
@@ -433,5 +646,167 @@ onMounted(load)
     width: 100%;
     text-align: right;
   }
+}
+
+/* ==================== 历史版本抽屉 ==================== */
+.revision-loading {
+  padding: 8px 0;
+}
+
+.revision-empty {
+  padding: 20px 0;
+  text-align: center;
+}
+
+.revision-empty-tip {
+  margin: 0;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.revision-timeline {
+  padding: 4px 4px 4px 8px;
+}
+
+.timeline-entry {
+  padding: 10px 12px;
+  border: 1px solid #ebedf0;
+  border-radius: 6px;
+  background: #fff;
+  cursor: default;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.revision-item .timeline-entry {
+  cursor: pointer;
+}
+
+.revision-item .timeline-entry:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 6px rgba(64, 158, 255, 0.15);
+}
+
+.entry-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.entry-version {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.entry-note {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.entry-note-tag {
+  max-width: 100%;
+  font-size: 12px;
+  color: #606266;
+  background: #f4f6f8;
+  border-radius: 4px;
+  padding: 1px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.current-entry .entry-version {
+  color: #409eff;
+}
+
+.back-btn {
+  margin-bottom: 12px;
+}
+
+.revision-detail {
+  padding: 4px 2px;
+}
+
+.detail-head {
+  margin-bottom: 16px;
+}
+
+.detail-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  word-break: break-word;
+}
+
+.detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.detail-note {
+  padding: 2px 6px;
+  background: #fdf6ec;
+  color: #e6a23c;
+  border-radius: 4px;
+}
+
+.detail-cover {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-top: 12px;
+}
+
+.detail-summary {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.7;
+  background: #f8fafc;
+  border-left: 3px solid #409eff;
+  padding: 8px 12px;
+  border-radius: 0 4px 4px 0;
+}
+
+.detail-content {
+  border: 1px solid #ebedf0;
+  border-radius: 6px;
+  padding: 12px 16px;
+  min-height: 180px;
+  max-height: calc(100vh - 420px);
+  overflow: auto;
+}
+
+/* md-editor-v3 预览最小高度（配合空正文兜底） */
+.detail-content :deep(.md-editor-preview) {
+  min-height: 160px;
+}
+
+.detail-actions {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rollback-tip {
+  font-size: 12px;
+  color: #909399;
 }
 </style>

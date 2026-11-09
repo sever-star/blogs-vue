@@ -1,5 +1,5 @@
 import client from './client'
-import type { Article, ArticleListItem, Tag, Category, ArticleQueryParams, ArticlePayload, PageQuery, PaginatedResponse } from '@/types'
+import type { Article, ArticleListItem, Tag, Category, ArticleQueryParams, ArticlePayload, PageQuery, PaginatedResponse, PostRevision, PostRevisionListItem } from '@/types'
 
 export type { ArticleQueryParams, ArticlePayload, PageQuery, PaginatedResponse }
 
@@ -163,4 +163,33 @@ export const favoriteArticle = async (id: number): Promise<{ favCount: number }>
  */
 export const unfavoriteArticle = async (id: number): Promise<{ favCount: number }> => {
   return client.delete(`/posts/${id}/favorite`)
+}
+
+// ==================== 文章版本控制 ====================
+
+/**
+ * 获取文章历史版本列表（不含正文，按 versionNo 倒序）
+ * 仅作者可访问；列表不含「当前版本」（当前态在文章本体）。
+ * GET /posts/{id}/revisions
+ */
+export const getPostRevisions = async (id: number): Promise<PostRevisionListItem[]> => {
+  return client.get(`/posts/${id}/revisions`)
+}
+
+/**
+ * 获取单个历史版本完整内容（含正文快照）
+ * GET /posts/{id}/revisions/{revId}
+ */
+export const getPostRevision = async (id: number, revId: number): Promise<PostRevision> => {
+  return client.get(`/posts/${id}/revisions/${revId}`)
+}
+
+/**
+ * 回滚文章到指定历史版本
+ * 回滚前后端自动存「当前状态」快照保证可逆；回滚后 reviewStatus=0 重新审核，
+ * 已发布的文章 status 置 2（下架待审），草稿保持 0。返回回滚后的完整文章对象。
+ * POST /posts/{id}/revisions/{revId}/rollback
+ */
+export const rollbackPostRevision = async (id: number, revId: number): Promise<Article> => {
+  return client.post(`/posts/${id}/revisions/${revId}/rollback`)
 }

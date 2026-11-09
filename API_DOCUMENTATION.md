@@ -3186,9 +3186,9 @@ Authorization: Bearer {accessToken}
 
 **URL 参数**
 
-| 参数 | 类型 | 说明 |
-|-----|------|------|
-| id | number | 文章 ID |
+| 参数 | 类型   | 说明    |
+| ---- | ------ | ------- |
+| id   | number | 文章 ID |
 
 **返回**
 
@@ -3219,14 +3219,14 @@ Authorization: Bearer {accessToken}
 
 **字段说明**
 
-| 字段 | 类型 | 说明 |
-|-----|------|------|
-| id | number | 版本记录 ID（后续取详情/回滚/diff 用）|
-| versionNo | number | 版本号，每篇文章内从 1 自增；按 `versionNo` 倒序返回 |
-| editedBy | number | 操作人 user_id |
-| editedByName | string | 操作人昵称（便于展示）|
-| editedAt | string | 快照时间 |
-| changeNote | string \| null | 变更说明；回滚触发的自动快照填 `"回滚至 vX 前的自动快照"` |
+| 字段         | 类型           | 说明                                                      |
+| ------------ | -------------- | --------------------------------------------------------- |
+| id           | number         | 版本记录 ID（后续取详情/回滚/diff 用）                    |
+| versionNo    | number         | 版本号，每篇文章内从 1 自增；按 `versionNo` 倒序返回      |
+| editedBy     | number         | 操作人 user_id                                            |
+| editedByName | string         | 操作人昵称（便于展示）                                    |
+| editedAt     | string         | 快照时间                                                  |
+| changeNote   | string \| null | 变更说明；回滚触发的自动快照填 `"回滚至 vX 前的自动快照"` |
 
 **错误情况**
 
@@ -3253,9 +3253,9 @@ Authorization: Bearer {accessToken}
 
 **URL 参数**
 
-| 参数 | 类型 | 说明 |
-|-----|------|------|
-| id | number | 文章 ID |
+| 参数  | 类型   | 说明        |
+| ----- | ------ | ----------- |
+| id    | number | 文章 ID     |
 | revId | number | 版本记录 ID |
 
 **返回**
@@ -3301,9 +3301,9 @@ Authorization: Bearer {accessToken}
 
 **URL 参数**
 
-| 参数 | 类型 | 说明 |
-|-----|------|------|
-| id | number | 文章 ID |
+| 参数  | 类型   | 说明                  |
+| ----- | ------ | --------------------- |
+| id    | number | 文章 ID               |
 | revId | number | 要回滚到的版本记录 ID |
 
 **返回**
@@ -3338,60 +3338,6 @@ Authorization: Bearer {accessToken}
 - 回滚走重新审核，不能直接上线——避免被篡改的历史版本直接对外
 - `status` 不进快照：日后若再回滚到「回滚前快照」撤销本次回滚，正文可恢复，但状态仍会被重置为待审，不会自动恢复「已发布」
 - 回滚前快照成为最新版本号，受 20 条保留上限保护（只删最早），不会被本轮裁剪误删
-
----
-
-### 15. 两版本对比（可选）
-
-> 前端用 diff 库渲染两版本字段差异。返回两版本的轻量字段及逐字段是否变更标记；`contentMd` 等长文本仅标记 changed，不回传全文（全文用「获取单个历史版本」按需取）。
-
-**请求**
-
-```
-GET /posts/{id}/revisions/diff?a={revId}&b={revId}
-Authorization: Bearer {accessToken}
-```
-
-**URL 参数**
-
-| 参数 | 类型 | 说明 |
-|-----|------|------|
-| id | number | 文章 ID |
-
-**Query 参数**
-
-| 参数 | 类型 | 必需 | 说明 |
-|-----|------|------|------|
-| a | number | 是 | 对比版本 A 的记录 ID |
-| b | number | 是 | 对比版本 B 的记录 ID |
-
-**返回**
-
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": {
-    "a": { "versionNo": 3, "editedAt": "2026-11-09T14:30:00" },
-    "b": { "versionNo": 5, "editedAt": "2026-11-09T16:00:00" },
-    "fields": [
-      { "field": "title", "changed": true,  "a": "旧标题", "b": "新标题" },
-      { "field": "summary", "changed": false, "a": "...", "b": "..." },
-      { "field": "contentMd", "changed": true },
-      { "field": "contentHtml", "changed": true },
-      { "field": "coverImage", "changed": false, "a": "...", "b": "..." },
-      { "field": "categoryId", "changed": true, "a": 2, "b": 3 }
-    ]
-  }
-}
-```
-
-**错误情况**
-
-- 401: 未登录 / accessToken 无效
-- 403: 仅文章作者可查看
-- 400: 缺少 `a` / `b` 参数
-- 404: 文章或任一版本不存在
 
 ---
 

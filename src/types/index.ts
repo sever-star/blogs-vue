@@ -86,6 +86,32 @@ export interface Article extends ArticleListItem {
   favorited: boolean
 }
 
+// ============ 文章版本 ============
+
+/** 文章历史版本（列表项，不含正文；GET /posts/{id}/revisions） */
+export interface PostRevisionListItem {
+  id: number
+  /** 版本号，每篇文章内从 1 自增 */
+  versionNo: number
+  editedBy: number
+  /** 操作人昵称（后端联表返回） */
+  editedByName: string
+  editedAt: string
+  /** 变更说明；回滚触发的自动快照为「回滚至 vX 前的自动快照」 */
+  changeNote: string | null
+}
+
+/** 文章历史版本（完整，含正文快照；GET /posts/{id}/revisions/{revId}） */
+export interface PostRevision extends PostRevisionListItem {
+  postId: number
+  title: string
+  contentMd: string
+  contentHtml: string
+  summary: string | null
+  coverImage: string | null
+  categoryId: number | null
+}
+
 // ============ 评论 ============
 
 /** 评论 */
