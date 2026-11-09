@@ -273,7 +273,7 @@ Cookie: refreshToken=...   (httpOnly，由浏览器自动携带，无需手动�
 > 核心是两件事——
 > ① 新登录**总是成功**，同时吊销该账号全部旧 refreshToken（旧设备失去续期能力）；
 > ② 会话被终结（新登录 / 登出 / 改密）时，**旧的 access token 立即失效**，
->    不依赖 15 分钟自然过期（access token 是无状态 JWT，单吊销 refresh token 做不到这一点）。
+> 不依赖 15 分钟自然过期（access token 是无状态 JWT，单吊销 refresh token 做不到这一点）。
 
 **机制：`blog_users.token_version` 会话版本号**
 
@@ -295,13 +295,13 @@ Cookie: refreshToken=...   (httpOnly，由浏览器自动携带，无需手动�
 
 **各端点改动汇总**
 
-| 端点 | 改动 |
-|---|---|
-| `POST /auth/login` | 登录成功先 `revokeAllByUserId` 再 bump `token_version`，然后签发新令牌 |
-| `POST /auth/refresh` | 不 bump 版本；签发新 access token 时**带上用户当前 `token_version`**（需查一次用户行） |
-| `POST /auth/logout` | 吊销 refresh token（已有）+ bump `token_version`（旧 access token 立即失效） |
-| `PUT /auth/me/password` | `revokeAllByUserId`（已有）+ bump `token_version` |
-| `JwtAuthenticationFilter` | `findById` 后比对 `tokenVersion` 与 claim `tv`，不匹配 → 401 |
+| 端点                      | 改动                                                                                   |
+| ------------------------- | -------------------------------------------------------------------------------------- |
+| `POST /auth/login`        | 登录成功先 `revokeAllByUserId` 再 bump `token_version`，然后签发新令牌                 |
+| `POST /auth/refresh`      | 不 bump 版本；签发新 access token 时**带上用户当前 `token_version`**（需查一次用户行） |
+| `POST /auth/logout`       | 吊销 refresh token（已有）+ bump `token_version`（旧 access token 立即失效）           |
+| `PUT /auth/me/password`   | `revokeAllByUserId`（已有）+ bump `token_version`                                      |
+| `JwtAuthenticationFilter` | `findById` 后比对 `tokenVersion` 与 claim `tv`，不匹配 → 401                           |
 
 **前端接入约定**
 
@@ -2045,8 +2045,8 @@ Authorization: Bearer {accessToken}
 
 **URL 参数**
 
-| 参数 | 类型 | 说明 |
-|-----|------|------|
+| 参数   | 类型   | 说明          |
+| ------ | ------ | ------------- |
 | userId | number | 被关注用户 ID |
 
 **返回**
@@ -2182,9 +2182,9 @@ Authorization: Bearer {accessToken}
 
 **Query 参数**
 
-| 参数        | 类型 | 必填 | 说明             |
-| ----------- | ---- | ---- | ---------------- |
-| followeeId  | int  | 是   | 被关注的用户 id  |
+| 参数       | 类型 | 必填 | 说明            |
+| ---------- | ---- | ---- | --------------- |
+| followeeId | int  | 是   | 被关注的用户 id |
 
 **返回**
 
@@ -2219,14 +2219,14 @@ Authorization: Bearer {accessToken}
 
 ### 6. 前端接入约定
 
-| 位置 | 接口 | 交互 |
-|---|---|---|
-| 详情页作者卡片「关注」按钮 ✅ | `GET /follows/{userId}/status` 初始化；点击 `POST`/`DELETE` 切换 | 未登录点击 → 弹登录框；成功后按钮在「关注 ↔ 已关注」间切换；看自己文章不展示按钮 |
-| 我的主页「关注的用户」选择栏 ✅ | `GET /follows/mine` | 头像 + 昵称 + `@用户名` + 简介行展示；暂无用户级主页，行不可跳转 |
-| 我的主页「我的粉丝」选择栏 ✅ | `GET /follows/fans?followeeId={userId}` | 复用关注列表行样式；切换到该 tab 时懒加载（仅首次） |
-| 我的主页「赞过的文章」 | `GET /posts/liked` | 复用 `ArticleCard` 渲染，点击进文章详情 |
-| 我的主页「收藏的文章」 | `GET /posts/favorited` | 同上 |
-| 我的主页「文章 / 获赞 / 浏览 / 粉丝」统计卡 ✅ | `GET /auth/{userId}` | 进入主页时拉取，四个数字绑定到头像卡片；加载中显示 `…` |
+| 位置                                           | 接口                                                             | 交互                                                                             |
+| ---------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 详情页作者卡片「关注」按钮 ✅                  | `GET /follows/{userId}/status` 初始化；点击 `POST`/`DELETE` 切换 | 未登录点击 → 弹登录框；成功后按钮在「关注 ↔ 已关注」间切换；看自己文章不展示按钮 |
+| 我的主页「关注的用户」选择栏 ✅                | `GET /follows/mine`                                              | 头像 + 昵称 + `@用户名` + 简介行展示；暂无用户级主页，行不可跳转                 |
+| 我的主页「我的粉丝」选择栏 ✅                  | `GET /follows/fans?followeeId={userId}`                          | 复用关注列表行样式；切换到该 tab 时懒加载（仅首次）                              |
+| 我的主页「赞过的文章」                         | `GET /posts/liked`                                               | 复用 `ArticleCard` 渲染，点击进文章详情                                          |
+| 我的主页「收藏的文章」                         | `GET /posts/favorited`                                           | 同上                                                                             |
+| 我的主页「文章 / 获赞 / 浏览 / 粉丝」统计卡 ✅ | `GET /auth/{userId}`                                             | 进入主页时拉取，四个数字绑定到头像卡片；加载中显示 `…`                           |
 
 ---
 
@@ -2247,9 +2247,9 @@ Authorization: Bearer {accessToken}
 
 **路径参数**
 
-| 参数     | 类型 | 必填 | 说明       |
-| -------- | ---- | ---- | ---------- |
-| userId   | int  | 是   | 目标用户 id |
+| 参数   | 类型 | 必填 | 说明        |
+| ------ | ---- | ---- | ----------- |
+| userId | int  | 是   | 目标用户 id |
 
 **返回**
 
@@ -2268,12 +2268,12 @@ Authorization: Bearer {accessToken}
 
 **字段说明**
 
-| 字段          | 类型 | 说明                                                                                |
-| ------------- | ---- | ----------------------------------------------------------------------------------- |
-| articleCount  | int  | 该用户**已发布**（status=1）且未软删的文章数；草稿/已下架不计                       |
+| 字段          | 类型 | 说明                                                                               |
+| ------------- | ---- | ---------------------------------------------------------------------------------- |
+| articleCount  | int  | 该用户**已发布**（status=1）且未软删的文章数；草稿/已下架不计                      |
 | likeCount     | int  | 该用户已发布文章收到的点赞总数（`SUM(blog_posts.like_count)`）；获赞数，非给出赞数 |
-| viewCount     | int  | 该用户已发布文章的累计浏览量（`SUM(blog_posts.view_count)`）                        |
-| followerCount | int  | 关注该用户的粉丝数（`blog_follows.followee_id` 计数）                               |
+| viewCount     | int  | 该用户已发布文章的累计浏览量（`SUM(blog_posts.view_count)`）                       |
+| followerCount | int  | 关注该用户的粉丝数（`blog_follows.followee_id` 计数）                              |
 
 **错误情况**
 
@@ -2532,9 +2532,9 @@ Content-Type: application/json
 { "title": "系统维护通知", "content": "本周六 02:00-04:00 系统维护，期间无法发文。" }
 ```
 
-| 参数    | 类型   | 说明                          |
-| ------- | ------ | ----------------------------- |
-| title   | string | 必填，1-100 字符              |
+| 参数    | 类型   | 说明                               |
+| ------- | ------ | ---------------------------------- |
+| title   | string | 必填，1-100 字符                   |
 | content | string | 必填，1-450 字符（见下方容量说明） |
 
 **返回**：公告对象 `{ id, title, content, createdBy, createdAt }`
@@ -2938,8 +2938,8 @@ Authorization: Bearer {accessToken}   // 必需
 
 **入参（JSON）**
 
-| 字段      | 类型   | 必需 | 说明                                       |
-| --------- | ------ | ---- | ------------------------------------------ |
+| 字段      | 类型   | 必需 | 说明                                             |
+| --------- | ------ | ---- | ------------------------------------------------ |
 | contentMd | string | 是   | 文章正文（Markdown），后端截断至 6000 字后送模型 |
 
 **返回**
@@ -2977,10 +2977,10 @@ Authorization: Bearer {accessToken}   // 必需
 
 **入参（JSON）**
 
-| 字段      | 类型   | 必需 | 说明                                         |
-| --------- | ------ | ---- | -------------------------------------------- |
-| contentMd | string | 是   | 文章正文（Markdown），后端截断至 6000 字     |
-| title     | string | 否   | 文章标题，作为上下文辅助生成                 |
+| 字段      | 类型   | 必需 | 说明                                     |
+| --------- | ------ | ---- | ---------------------------------------- |
+| contentMd | string | 是   | 文章正文（Markdown），后端截断至 6000 字 |
+| title     | string | 否   | 文章标题，作为上下文辅助生成             |
 
 **返回**
 
@@ -3103,9 +3103,9 @@ GET /posts/search?keyword=Vue3
 
 **错误情况**
 
-| 状态码 | 说明 |
-|-------|------|
-| 400 | `keyword` 为空或全空白 |
+| 状态码 | 说明                   |
+| ------ | ---------------------- |
+| 400    | `keyword` 为空或全空白 |
 
 **备注**
 
@@ -3173,6 +3173,228 @@ Authorization: Bearer {accessToken}
 
 ---
 
+### 12. 获取文章历史版本列表
+
+> 文章版本控制：每次编辑覆盖前把「编辑前状态」存一条快照（append-only）。本接口返回某篇文章的历史版本时间线，**不含正文**，用于在「历史版本」抽屉/弹窗里展示列表。详见 `智能博客功能方案.md · 功能一`。
+
+**请求**
+
+```
+GET /posts/{id}/revisions
+Authorization: Bearer {accessToken}
+```
+
+**URL 参数**
+
+| 参数 | 类型 | 说明 |
+|-----|------|------|
+| id | number | 文章 ID |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": [
+    {
+      "id": 101,
+      "versionNo": 3,
+      "editedBy": 5,
+      "editedByName": "张三",
+      "editedAt": "2026-11-09T14:30:00",
+      "changeNote": "补充示例代码"
+    },
+    {
+      "id": 98,
+      "versionNo": 2,
+      "editedBy": 5,
+      "editedByName": "张三",
+      "editedAt": "2026-11-08T10:12:00",
+      "changeNote": null
+    }
+  ]
+}
+```
+
+**字段说明**
+
+| 字段 | 类型 | 说明 |
+|-----|------|------|
+| id | number | 版本记录 ID（后续取详情/回滚/diff 用）|
+| versionNo | number | 版本号，每篇文章内从 1 自增；按 `versionNo` 倒序返回 |
+| editedBy | number | 操作人 user_id |
+| editedByName | string | 操作人昵称（便于展示）|
+| editedAt | string | 快照时间 |
+| changeNote | string \| null | 变更说明；回滚触发的自动快照填 `"回滚至 vX 前的自动快照"` |
+
+**错误情况**
+
+- 401: 未登录 / accessToken 无效
+- 403: 仅文章作者可查看（管理员不越权，与 `PUT /posts/{id}` 一致）
+- 404: 文章不存在
+
+**备注**
+
+- 列表只含历史快照，**当前最新版本不在其中**（当前态在 `blog_posts`）；前端时间线如需展示「当前版本」，从文章详情接口实时取
+- 内容未变化的编辑不入库（比对 `content_md` 哈希去噪），故版本号可能不连续
+- 每篇文章保留最近 20 条（配置项 `blog.revision.keep`），超出按 `versionNo` 升序删最早的
+
+---
+
+### 13. 获取单个历史版本完整内容
+
+**请求**
+
+```
+GET /posts/{id}/revisions/{revId}
+Authorization: Bearer {accessToken}
+```
+
+**URL 参数**
+
+| 参数 | 类型 | 说明 |
+|-----|------|------|
+| id | number | 文章 ID |
+| revId | number | 版本记录 ID |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "id": 101,
+    "versionNo": 3,
+    "postId": 42,
+    "title": "Vue 3 Composition API 完全指南",
+    "contentMd": "# Vue 3 ...\n...",
+    "contentHtml": "<h1>Vue 3 ...</h1>...",
+    "summary": "深入了解 Vue 3 的 Composition API...",
+    "coverImage": "https://picsum.photos/800/400?random=1",
+    "categoryId": 2,
+    "editedBy": 5,
+    "editedByName": "张三",
+    "editedAt": "2026-11-09T14:30:00",
+    "changeNote": "补充示例代码"
+  }
+}
+```
+
+**错误情况**
+
+- 401: 未登录 / accessToken 无效
+- 403: 仅文章作者可查看
+- 404: 文章或版本不存在；版本归属与文章不一致时也按 404 处理
+
+---
+
+### 14. 回滚到指定历史版本
+
+**请求**
+
+```
+POST /posts/{id}/revisions/{revId}/rollback
+Authorization: Bearer {accessToken}
+```
+
+**URL 参数**
+
+| 参数 | 类型 | 说明 |
+|-----|------|------|
+| id | number | 文章 ID |
+| revId | number | 要回滚到的版本记录 ID |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    // 回滚后的完整文章对象，结构同「更新文章」返回
+  }
+}
+```
+
+**处理逻辑**
+
+1. 校验文章归属（仅作者）
+2. **回滚前先存当前状态**为一条新 revision（`change_note` 自动填 `"回滚至 vX 前的自动快照"`），保证回滚可逆
+3. 把该 revision 的 `title / contentMd / contentHtml / summary / coverImage / categoryId` 拷回 `blog_posts`（`status`、`reviewStatus` 不在快照内，按下方规则重置）
+4. `reviewStatus = 0`（回滚内容需重新审核）；`status =` 原已发布则置 `2`（下架待审），原草稿保持 `0`
+5. 保存并返回更新后的文章
+
+**错误情况**
+
+- 401: 未登录 / accessToken 无效
+- 403: 仅文章作者可回滚（管理员不越权）
+- 404: 文章或版本不存在
+- 400: 版本归属与文章不一致
+
+**备注**
+
+- 回滚走重新审核，不能直接上线——避免被篡改的历史版本直接对外
+- `status` 不进快照：日后若再回滚到「回滚前快照」撤销本次回滚，正文可恢复，但状态仍会被重置为待审，不会自动恢复「已发布」
+- 回滚前快照成为最新版本号，受 20 条保留上限保护（只删最早），不会被本轮裁剪误删
+
+---
+
+### 15. 两版本对比（可选）
+
+> 前端用 diff 库渲染两版本字段差异。返回两版本的轻量字段及逐字段是否变更标记；`contentMd` 等长文本仅标记 changed，不回传全文（全文用「获取单个历史版本」按需取）。
+
+**请求**
+
+```
+GET /posts/{id}/revisions/diff?a={revId}&b={revId}
+Authorization: Bearer {accessToken}
+```
+
+**URL 参数**
+
+| 参数 | 类型 | 说明 |
+|-----|------|------|
+| id | number | 文章 ID |
+
+**Query 参数**
+
+| 参数 | 类型 | 必需 | 说明 |
+|-----|------|------|------|
+| a | number | 是 | 对比版本 A 的记录 ID |
+| b | number | 是 | 对比版本 B 的记录 ID |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "a": { "versionNo": 3, "editedAt": "2026-11-09T14:30:00" },
+    "b": { "versionNo": 5, "editedAt": "2026-11-09T16:00:00" },
+    "fields": [
+      { "field": "title", "changed": true,  "a": "旧标题", "b": "新标题" },
+      { "field": "summary", "changed": false, "a": "...", "b": "..." },
+      { "field": "contentMd", "changed": true },
+      { "field": "contentHtml", "changed": true },
+      { "field": "coverImage", "changed": false, "a": "...", "b": "..." },
+      { "field": "categoryId", "changed": true, "a": 2, "b": 3 }
+    ]
+  }
+}
+```
+
+**错误情况**
+
+- 401: 未登录 / accessToken 无效
+- 403: 仅文章作者可查看
+- 400: 缺少 `a` / `b` 参数
+- 404: 文章或任一版本不存在
+
+---
+
 ## 站内通知接口
 
 ### 1. 通知列表
@@ -3186,20 +3408,20 @@ Authorization: Bearer {accessToken}
 
 **Query 参数**
 
-| 参数       | 类型     | 必需 | 说明                                                                 |
-| ---------- | -------- | ---- | -------------------------------------------------------------------- |
-| page       | number   | 否   | 页码，默认 1                                                         |
-| pageSize   | number   | 否   | 每页条数，默认 10                                                    |
-| onlyUnread | boolean  | 否   | 只看未读，默认 false                                                 |
+| 参数       | 类型     | 必需 | 说明                                                                    |
+| ---------- | -------- | ---- | ----------------------------------------------------------------------- |
+| page       | number   | 否   | 页码，默认 1                                                            |
+| pageSize   | number   | 否   | 每页条数，默认 10                                                       |
+| onlyUnread | boolean  | 否   | 只看未读，默认 false                                                    |
 | types      | string[] | 否   | 按原始 type 过滤（重复 key 传多值）；缺省返回全部类型。用于分类模块分页 |
 
 **`types` 与前端分类 tab 的映射**
 
-| tab      | types                                                    |
-| -------- | -------------------------------------------------------- |
-| 评论通知 | `post_comment`, `comment_reply`                          |
-| 点赞收藏 | `like`, `comment_like`, `favorite`                       |
-| 关注     | `follow`                                                 |
+| tab      | types                                                   |
+| -------- | ------------------------------------------------------- |
+| 评论通知 | `post_comment`, `comment_reply`                         |
+| 点赞收藏 | `like`, `comment_like`, `favorite`                      |
+| 关注     | `follow`                                                |
 | 系统     | `announcement`, `system`, `message`（旧私信数据归系统） |
 
 > 传 `types` 后 `total` 为该分类下的总数，分页以该值为准。
@@ -3620,21 +3842,30 @@ CREATE TABLE blog_post_favorites (
 
 ### 四、文章版本与定时发布
 
-#### blog_post_versions 表（文章版本历史）
+#### blog_post_revisions 表（文章版本历史快照）
+
+> 实际建表脚本：`blog/docs/create-blog-post-revisions.sql`（PostgreSQL，容器 `blog-pg-verify`，库 `blog`，已于 2026-11-09 执行）。下方 DDL 与库内一致；`AUTO_INCREMENT` / `COMMENT` 为 MySQL 风格占位，实际库用 `GENERATED BY DEFAULT AS IDENTITY` + `COMMENT ON COLUMN`。
 
 ```sql
-CREATE TABLE blog_post_versions (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  post_id INT NOT NULL,
-  version INT NOT NULL COMMENT '版本号,从1递增',
-  title VARCHAR(200) NOT NULL,
-  content_md LONGTEXT NOT NULL,
-  content_html LONGTEXT DEFAULT NULL,
-  change_note VARCHAR(200) DEFAULT NULL COMMENT '版本变更说明',
-  created_at DATETIME NOT NULL,
-  UNIQUE KEY uk_post_version (post_id, version)
+CREATE TABLE blog_post_revisions (
+  id BIGINT PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
+  post_id INTEGER NOT NULL REFERENCES blog_posts(id) ON DELETE CASCADE,
+  version_no INTEGER NOT NULL,               -- 版本号，每篇文章内从 1 自增
+  title VARCHAR(200) NOT NULL,               -- 标题快照
+  content_md TEXT,                           -- 正文 markdown 快照
+  content_html TEXT,                         -- 正文 html 快照
+  summary VARCHAR(500),                      -- 摘要快照
+  cover_image VARCHAR(255),                  -- 封面快照（与 blog_posts.cover_image 长度对齐）
+  category_id INTEGER,                       -- 分类快照，回滚时一并还原
+  edited_by INTEGER NOT NULL,                -- 操作人 user_id
+  edited_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  change_note VARCHAR(200)                   -- 变更说明（可选，AI 生成或用户手填；回滚触发的自动快照填「回滚至 vX 前的自动快照」）
 );
+-- 唯一索引 (post_id, version_no)，最左前缀已覆盖 post_id 单列查询，无需另建 post_id 索引
+CREATE UNIQUE INDEX uk_post_revisions_post_version ON blog_post_revisions (post_id, version_no);
 ```
+
+> 软删除文章（`deletePost` 置 `deleted_at`）不触发 `ON DELETE CASCADE`，revision 随软删文章保留；CASCADE 留给后续物理删除方法兜底。每篇文章保留最近 20 条（配置项 `blog.revision.keep`）。
 
 #### blog_scheduled_posts 表（定时发布）
 
@@ -3931,10 +4162,10 @@ Authorization: Bearer {accessToken}
 
 **Query 参数**
 
-| 参数 | 类型 | 必需 | 默认值 | 说明 |
-|------|------|:----:|--------|------|
-| page | number | 否 | 1 | 页码，从 1 开始 |
-| pageSize | number | 否 | 20 | 每页条数 |
+| 参数     | 类型   | 必需 | 默认值 | 说明            |
+| -------- | ------ | :--: | ------ | --------------- |
+| page     | number |  否  | 1      | 页码，从 1 开始 |
+| pageSize | number |  否  | 20     | 每页条数        |
 
 **返回**（`PageResult` 结构）
 
@@ -3969,13 +4200,13 @@ Authorization: Bearer {accessToken}
 
 **字段说明**
 
-| 字段 | 说明 |
-|------|------|
-| `id` | 会话 ID |
-| `peerUser` | 对方用户信息（`id`/`username`/`nickname`/`avatar`），**不含邮箱等敏感字段** |
-| `lastMessagePreview` | 最后一条消息正文（超过 50 字符截断并加 `…`） |
-| `lastMessageAt` | 最后一条消息时间（按此字段倒序排列） |
-| `unreadCount` | 当前用户在该会话的未读消息数（`a/b_unread_count` 按身份映射） |
+| 字段                 | 说明                                                                        |
+| -------------------- | --------------------------------------------------------------------------- |
+| `id`                 | 会话 ID                                                                     |
+| `peerUser`           | 对方用户信息（`id`/`username`/`nickname`/`avatar`），**不含邮箱等敏感字段** |
+| `lastMessagePreview` | 最后一条消息正文（超过 50 字符截断并加 `…`）                                |
+| `lastMessageAt`      | 最后一条消息时间（按此字段倒序排列）                                        |
+| `unreadCount`        | 当前用户在该会话的未读消息数（`a/b_unread_count` 按身份映射）               |
 
 **错误情况**
 
@@ -4002,8 +4233,8 @@ Authorization: Bearer {accessToken}
 
 **URL 参数**
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
+| 参数   | 类型   | 说明        |
+| ------ | ------ | ----------- |
 | userId | number | 对方用户 ID |
 
 **返回**（结构同接口 1 的单条会话对象；新建时 `lastMessagePreview`/`lastMessageAt` 为 `null`）
@@ -4055,16 +4286,16 @@ Authorization: Bearer {accessToken}
 
 **URL 参数**
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
+| 参数           | 类型   | 说明    |
+| -------------- | ------ | ------- |
 | conversationId | number | 会话 ID |
 
 **Query 参数**
 
-| 参数 | 类型 | 必需 | 默认值 | 说明 |
-|------|------|:----:|--------|------|
-| page | number | 否 | 1 | 页码，从 1 开始 |
-| pageSize | number | 否 | 20 | 每页条数 |
+| 参数     | 类型   | 必需 | 默认值 | 说明            |
+| -------- | ------ | :--: | ------ | --------------- |
+| page     | number |  否  | 1      | 页码，从 1 开始 |
+| pageSize | number |  否  | 20     | 每页条数        |
 
 **返回**（`PageResult` 结构；消息按 `createdAt` **倒序**返回，最新在前）
 
@@ -4128,10 +4359,10 @@ Content-Type: application/json
 }
 ```
 
-| 参数 | 类型 | 必需 | 说明 |
-|------|------|:----:|------|
-| receiverId | number | 是 | 接收方用户 ID |
-| content | string | 是 | 消息正文，1-2000 字符，不能为空白 |
+| 参数       | 类型   | 必需 | 说明                              |
+| ---------- | ------ | :--: | --------------------------------- |
+| receiverId | number |  是  | 接收方用户 ID                     |
+| content    | string |  是  | 消息正文，1-2000 字符，不能为空白 |
 
 **返回**
 
@@ -4182,8 +4413,8 @@ Authorization: Bearer {accessToken}
 
 **URL 参数**
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
+| 参数           | 类型   | 说明    |
+| -------------- | ------ | ------- |
 | conversationId | number | 会话 ID |
 
 **返回**
@@ -4225,8 +4456,8 @@ Authorization: Bearer {accessToken}
 
 **URL 参数**
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
+| 参数           | 类型   | 说明    |
+| -------------- | ------ | ------- |
 | conversationId | number | 会话 ID |
 
 **返回**
@@ -4290,16 +4521,16 @@ Authorization: Bearer {accessToken}
 
 #### 前端接入约定
 
-| 位置 | 接口 | 交互 |
-|------|------|------|
-| Header 铃铛「私信」入口 / `/messages?tab=message` | `GET /messages/conversations` | 会话列表（头像 + 昵称 + 最后消息摘要 + 未读角标 + 时间） |
-| 用户头像旁「私信」按钮（文章详情/评论区等） | 仅 `router.push('/messages?userId={peerId}&nick=…&avatar=…')`，**不调接口** | 未登录点击 → 弹登录框；看自己不展示按钮。进入草稿态，会话在首条消息发送时才创建 |
-| `/messages?userId={peerId}` 选中会话 | `GET /messages/conversations/{conversationId}/messages` | 气泡聊天窗，按时间倒序分页加载。草稿态（`id=0`）不拉取 |
-| 发送消息 | WebSocket `{type:"send"}` | 等 `send_ack` 回执追加气泡；草稿态下拿到真实 `conversationId` 后刷新左栏列表并选中真实会话。REST `POST /messages` 保留作兜底 |
-| 打开会话/切换会话 | `PUT /messages/conversations/{conversationId}/read` | 清零该会话未读（乐观清角标），随后刷新 `GET /messages/unread-count` 同步铃铛「私信」角标 |
-| 删除会话 | `DELETE /messages/conversations/{conversationId}` | `ElMessageBox.confirm` 确认后本地移除行，删除后刷新 `GET /messages/unread-count` |
-| Header 铃铛「私信」角标 | `GET /messages/unread-count` | 私信未读总数（登录时拉取，登出清空）；与通知 `byType` 无关 |
-| 对方实时发来的新消息 | WebSocket `{type:"message"}` 推送 | 在线时服务端主动推；未读角标 +1，正看该会话则追加气泡 + 标记已读，否则弹桌面通知 |
+| 位置                                              | 接口                                                                        | 交互                                                                                                                         |
+| ------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Header 铃铛「私信」入口 / `/messages?tab=message` | `GET /messages/conversations`                                               | 会话列表（头像 + 昵称 + 最后消息摘要 + 未读角标 + 时间）                                                                     |
+| 用户头像旁「私信」按钮（文章详情/评论区等）       | 仅 `router.push('/messages?userId={peerId}&nick=…&avatar=…')`，**不调接口** | 未登录点击 → 弹登录框；看自己不展示按钮。进入草稿态，会话在首条消息发送时才创建                                              |
+| `/messages?userId={peerId}` 选中会话              | `GET /messages/conversations/{conversationId}/messages`                     | 气泡聊天窗，按时间倒序分页加载。草稿态（`id=0`）不拉取                                                                       |
+| 发送消息                                          | WebSocket `{type:"send"}`                                                   | 等 `send_ack` 回执追加气泡；草稿态下拿到真实 `conversationId` 后刷新左栏列表并选中真实会话。REST `POST /messages` 保留作兜底 |
+| 打开会话/切换会话                                 | `PUT /messages/conversations/{conversationId}/read`                         | 清零该会话未读（乐观清角标），随后刷新 `GET /messages/unread-count` 同步铃铛「私信」角标                                     |
+| 删除会话                                          | `DELETE /messages/conversations/{conversationId}`                           | `ElMessageBox.confirm` 确认后本地移除行，删除后刷新 `GET /messages/unread-count`                                             |
+| Header 铃铛「私信」角标                           | `GET /messages/unread-count`                                                | 私信未读总数（登录时拉取，登出清空）；与通知 `byType` 无关                                                                   |
+| 对方实时发来的新消息                              | WebSocket `{type:"message"}` 推送                                           | 在线时服务端主动推；未读角标 +1，正看该会话则追加气泡 + 标记已读，否则弹桌面通知                                             |
 
 **实时性**：已接入 WebSocket（`/ws/messages`，协议见上文）。Header 登录时建立连接并拉一次 `GET /messages/unread-count`；`/messages` 页在标记已读 / 删除会话后主动刷新该值。断线指数退避重连，握手失败（access token 过期）先刷新再重连。
 
