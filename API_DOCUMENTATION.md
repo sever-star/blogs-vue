@@ -805,6 +805,77 @@ Authorization: Bearer {accessToken}
 
 - 「我的文章」已发布行内有「下架」按钮；文章详情页作者/管理员在已发布文章标题旁有「下架」按钮（`canOffline`）；均先 `ElMessageBox` 二次确认，成功后本地 `status` 置 2（tab 分组/计数自动更新，详情页按钮随 `canOffline` 消失）
 
+#### 6.5 获取 AI 审核辅助建议（待实现）
+
+> **依据**：`智能博客功能方案.md · 功能三`。作者提交审核时（`review_status` 置 0）后端**异步**调一轮 AI 预检，结果写入 `blog_posts.ai_review` 字段（JSON，无需新表）。管理员打开审核详情时读取本字段展示参考，**AI 永不自动通过/驳回**，最终决定权仍在审核员。
+>
+> 字段说明（前端渲染依据）：`post.ai_review` 结构为 `{ status, complianceScore, sensitiveWords[], qualityScore, plagiarismHint, summary, suggestion, model, tokens, errorMessage, generatedAt }`；`status=0` 生成中、`1` 成功、`2` 失败（含未配置/异常，前端据此显示「AI 辅助不可用」）。
+
+**请求**
+
+```
+GET /admin/reviews/{postId}/ai-aid
+Authorization: Bearer {accessToken}
+```
+
+**URL 参数**
+
+| 参数    | 类型   | 说明    |
+| ------- | ------ | ------- |
+| postId  | number | 文章 ID |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "status": 1,
+    "complianceScore": 92,
+    "sensitiveWords": ["涉黄", "暴力"],
+    "qualityScore": 85,
+    "plagiarismHint": "疑似与站外文章《xxx》重复",
+    "summary": "内容整体合规，结构清晰，建议重点复核结论部分",
+    "suggestion": "manual",
+    "model": "deepseek-chat",
+    "tokens": 1234,
+    "errorMessage": null,
+    "generatedAt": "2026-11-10T10:00:00"
+  }
+}
+```
+
+**字段说明**
+
+| 字段             | 类型           | 说明                                     |
+| ---------------- | -------------- | ---------------------------------------- |
+| status           | number         | `0`生成中 `1`成功 `2`失败;失败时其余字段可空 |
+| complianceScore  | number \| null | 合规分 0-100（越高越合规）              |
+| sensitiveWords   | string[]       | 命中敏感词列表（无则空数组）             |
+| qualityScore     | number \| null | 质量分 0-100                            |
+| plagiarismHint   | string \| null | 疑似抄袭/拼凑迹象（无则 null）            |
+| summary          | string \| null | AI 一句话总体评价                        |
+| suggestion       | string \| null | `pass`/`reject`/`manual`（建议人工复核） |
+| model            | string \| null | 生成模型名                                |
+| tokens           | number \| null | 本次调用 token 消耗                      |
+| errorMessage     | string \| null | 失败原因（未配置 Key/超时/解析失败等）   |
+| generatedAt      | string \| null | 生成时间                                  |
+
+**错误情况**
+
+- 401: 未登录
+- 403: 非管理员
+- 404: 文章不存在
+
+**备注**
+
+- **数据载体**：本接口直接读/回 `blog_posts.ai_review` 字段，不新建表
+- **生成时机**：作者提交/重新提交审核时异步生成并覆盖写字段；`updatePost`（`review_status` 归 0）或首次提交时触发
+- **降级**：AI 未配置、超时或解析失败 → `status=2` + `errorMessage`，审核页显示「AI 辅助不可用」，回退纯人工审核，不阻塞审核流程
+- **建议徽标映射**：`pass`→绿色「建议通过」、`reject`→红色「建议驳回」、`manual`→橙色「建议人工复核」；顶部始终标注「⚠ AI 建议仅供参考，最终由人工决定」
+- **审计**：异步生成时复用 `blog_ai_usage`（type=review_assist, ref_type=post, ref_id=文章id）；「后端已实现/接口是否就绪」以 `智能博客功能方案.md` 实施进度为准
+
 ---
 
 ### 7. 点赞文章
