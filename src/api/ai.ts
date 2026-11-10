@@ -115,6 +115,43 @@ export const generateArticleSummary = async (contentMd: string, title?: string):
   return res.summary
 }
 
+// ============ 文章标签/分类推荐（受控集合，只从站内已有中选，不新建） ============
+
+/** AI 推荐的标签（id 均为 blog_tags 中实际存在的标签） */
+export interface AiSuggestedTag {
+  id: number
+  name: string
+}
+
+/**
+ * AI 推荐标签（受控集合）
+ * POST /ai/suggest-tags，body { contentMd, title? }，返回 { tags: [{id, name}] }
+ * 只从站内已有标签中选，不会新建标签；无匹配/解析失败返回空数组；
+ * 需登录；accessToken 过期由 client 拦截器自动刷新重试。
+ */
+export const suggestArticleTags = async (
+  contentMd: string,
+  title?: string
+): Promise<AiSuggestedTag[]> => {
+  const res: { tags: AiSuggestedTag[] } = await client.post('/ai/suggest-tags', {
+    contentMd,
+    title,
+  })
+  return res.tags ?? []
+}
+
+/**
+ * AI 推荐分类（受控集合）
+ * POST /ai/suggest-category，body { contentMd, title? }，返回 { categoryId, categoryName }
+ * 只从站内现有分类中选；解析失败/分类不存在时 categoryId=null，需用户自选。
+ */
+export const suggestArticleCategory = async (
+  contentMd: string,
+  title?: string
+): Promise<{ categoryId: number | null; categoryName: string | null }> => {
+  return client.post('/ai/suggest-category', { contentMd, title })
+}
+
 // ============ 流式对话 ============
 
 /** 流式回调集合 */

@@ -99,41 +99,61 @@
           </div>
         </el-form-item>
 
-        <!-- 文章分类 -->
+        <!-- 文章分类：可 AI 推荐（只从站内现有分类中选，不会新建分类） -->
         <el-form-item label="文章分类" required>
-          <el-select
-            v-model="formData.categoryId"
-            placeholder="请选择文章分类"
-            style="width: 100%"
-            clearable
-          >
-            <el-option
-              v-for="category in categoryStore.categoryOptions"
-              :key="category.value"
-              :label="category.label"
-              :value="category.value"
-            />
-          </el-select>
+          <div class="field-with-ai">
+            <el-select
+              v-model="formData.categoryId"
+              placeholder="请选择文章分类"
+              class="field-with-ai__input"
+              clearable
+            >
+              <el-option
+                v-for="category in categoryStore.categoryOptions"
+                :key="category.value"
+                :label="category.label"
+                :value="category.value"
+              />
+            </el-select>
+            <el-button
+              class="ai-btn"
+              :loading="suggestingCategory"
+              @click="handleSuggestCategory"
+            >
+              <el-icon v-if="!suggestingCategory"><MagicStick /></el-icon>
+              AI 推荐
+            </el-button>
+          </div>
         </el-form-item>
 
-        <!-- 文章标签 -->
+        <!-- 文章标签：可 AI 推荐（只从站内已有标签中选，不会新建标签） -->
         <el-form-item label="文章标签" required>
-          <el-select
-            v-model="formData.tags"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            placeholder="选择或创建标签"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="tag in availableTags"
-              :key="tag"
-              :label="tag"
-              :value="tag"
-            />
-          </el-select>
+          <div class="field-with-ai">
+            <el-select
+              v-model="formData.tags"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              placeholder="选择或创建标签"
+              class="field-with-ai__input"
+            >
+              <el-option
+                v-for="tag in availableTags"
+                :key="tag"
+                :label="tag"
+                :value="tag"
+              />
+            </el-select>
+            <el-button
+              class="ai-btn"
+              :loading="suggestingTags"
+              @click="handleSuggestTags"
+            >
+              <el-icon v-if="!suggestingTags"><MagicStick /></el-icon>
+              AI 推荐
+            </el-button>
+          </div>
         </el-form-item>
 
         <!-- 文章封面（可选）：点击选择本地图片，选中即上传 OSS，URL 随文章提交 -->
@@ -236,7 +256,12 @@ import { useAuthStore } from "@/stores/auth";
 import { useCategoryStore } from "@/stores/category";
 import { createTag } from "@/api/tag";
 import { uploadCover } from "@/api/upload";
-import { generateArticleTitle, generateArticleSummary } from "@/api/ai";
+import {
+  generateArticleTitle,
+  generateArticleSummary,
+  suggestArticleTags,
+  suggestArticleCategory,
+} from "@/api/ai";
 import { ElMessage } from "element-plus";
 import type { UploadFile } from "element-plus";
 import { Loading, MagicStick } from "@element-plus/icons-vue";
@@ -308,6 +333,8 @@ const coverUploading = ref(false);
 
 const generatingTitle = ref(false);
 const generatingSummary = ref(false);
+const suggestingTags = ref(false);
+const suggestingCategory = ref(false);
 
 /** 正文太短时模型无意义，给个兜底提示而非空跑一次计费调用 */
 function requireEnoughContent(): string | null {
@@ -347,6 +374,65 @@ async function handleGenerateSummary() {
     ElMessage.error(error?.message || "摘要生成失败，请重试或手动填写");
   } finally {
     generatingSummary.value = false;
+  }
+}
+
+/**
+ * AI 推荐标签：只从站内已有标签中选（受控集合，不会新建标签），
+ * 返回的 id+name 合并进标签选择器；全部为真实存在标签，
+ * 提交时 resolveTagIds 直接复用已有 id，不会触发 createTag。
+ */
+async function handleSuggestTags() {
+  const content = requireEnoughContent();
+  if (!content) return;
+  suggestingTags.value = true;
+  try {
+    const suggested = await suggestArticleTags(content, formData.value.title);
+    if (!suggested || suggested.length === 0) {
+      ElMessage.info("暂无可推荐标签，可尝试手动选择或创建");
+      return;
+    }
+    // 只并入还没选过的标签名，避免重复项
+    const existing = new Set(formData.value.tags);
+    let added = 0;
+    for (const tag of suggested) {
+      if (!tag.name || existing.has(tag.name)) continue;
+      formData.value.tags.push(tag.name);
+      existing.add(tag.name);
+      added++;
+    }
+    if (added === 0) {
+      ElMessage.info("推荐标签已在选择中");
+    } else {
+      ElMessage.success(`已推荐 ${added} 个标签，可再手动增删`);
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.message || "标签推荐失败，请重试或手动选择");
+  } finally {
+    suggestingTags.value = false;
+  }
+}
+
+/** AI 推荐分类：只从站内现有分类中选；categoryId 为空时提示手动选择 */
+async function handleSuggestCategory() {
+  const content = requireEnoughContent();
+  if (!content) return;
+  suggestingCategory.value = true;
+  try {
+    const { categoryId, categoryName } = await suggestArticleCategory(
+      content,
+      formData.value.title
+    );
+    if (!categoryId) {
+      ElMessage.info("未找到合适的分类，请手动选择");
+      return;
+    }
+    formData.value.categoryId = categoryId;
+    ElMessage.success(categoryName ? `已选分类：${categoryName}` : "已选分类");
+  } catch (error: any) {
+    ElMessage.error(error?.message || "分类推荐失败，请重试或手动选择");
+  } finally {
+    suggestingCategory.value = false;
   }
 }
 
