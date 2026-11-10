@@ -807,9 +807,9 @@ Authorization: Bearer {accessToken}
 
 #### 6.5 获取 AI 审核辅助建议（待实现）
 
-> **依据**：`智能博客功能方案.md · 功能三`。作者提交审核时（`review_status` 置 0）后端**异步**调一轮 AI 预检，结果写入 `blog_posts.ai_review` 字段（JSON，无需新表）。管理员打开审核详情时读取本字段展示参考，**AI 永不自动通过/驳回**，最终决定权仍在审核员。
+> **依据**：`智能博客功能方案.md · 功能三`。作者提交审核时（`review_status` 置 0）后端**异步**调一轮 AI 预检，**完整建议 JSON 写入 `blog_ai_usage` 审计表（append-only 留档，可回溯），文章表只保留 `ai_review_summary` 一句话摘要**——不新建表。管理员打开审核详情时由本接口合并返回，**AI 永不自动通过/驳回**，最终决定权仍在审核员。
 >
-> 字段说明（前端渲染依据）：`post.ai_review` 结构为 `{ status, complianceScore, sensitiveWords[], qualityScore, plagiarismHint, summary, suggestion, model, tokens, errorMessage, generatedAt }`；`status=0` 生成中、`1` 成功、`2` 失败（含未配置/异常，前端据此显示「AI 辅助不可用」）。
+> 数据来源：`data` 的 `summary` 读 `blog_posts.ai_review_summary`；`status` 及其余详情字段来自 `blog_ai_usage`（`type=review_assist, ref_type=post, ref_id=postId` 最新一条）。`status=0` 生成中、`1` 成功、`2` 失败（含未配置/异常，前端据此显示「AI 辅助不可用」）。
 
 **请求**
 
@@ -850,17 +850,17 @@ Authorization: Bearer {accessToken}
 
 | 字段             | 类型           | 说明                                     |
 | ---------------- | -------------- | ---------------------------------------- |
-| status           | number         | `0`生成中 `1`成功 `2`失败;失败时其余字段可空 |
+| status           | number         | `0`生成中 `1`成功 `2`失败;失败时其余字段可空（来自审计表） |
 | complianceScore  | number \| null | 合规分 0-100（越高越合规）              |
 | sensitiveWords   | string[]       | 命中敏感词列表（无则空数组）             |
 | qualityScore     | number \| null | 质量分 0-100                            |
 | plagiarismHint   | string \| null | 疑似抄袭/拼凑迹象（无则 null）            |
-| summary          | string \| null | AI 一句话总体评价                        |
+| summary          | string \| null | AI 一句话总体评价（读 `blog_posts.ai_review_summary`） |
 | suggestion       | string \| null | `pass`/`reject`/`manual`（建议人工复核） |
 | model            | string \| null | 生成模型名                                |
 | tokens           | number \| null | 本次调用 token 消耗                      |
 | errorMessage     | string \| null | 失败原因（未配置 Key/超时/解析失败等）   |
-| generatedAt      | string \| null | 生成时间                                  |
+| generatedAt      | string \| null | 生成时间（审计条目的时间）                |
 
 **错误情况**
 
@@ -870,11 +870,13 @@ Authorization: Bearer {accessToken}
 
 **备注**
 
-- **数据载体**：本接口直接读/回 `blog_posts.ai_review` 字段，不新建表
-- **生成时机**：作者提交/重新提交审核时异步生成并覆盖写字段；`updatePost`（`review_status` 归 0）或首次提交时触发
-- **降级**：AI 未配置、超时或解析失败 → `status=2` + `errorMessage`，审核页显示「AI 辅助不可用」，回退纯人工审核，不阻塞审核流程
+- **分层存储**：完整建议 → `blog_ai_usage`（append-only，每次重新提交审核**追加**新记录，历史建议全部可回溯）；展示摘要 → `blog_posts.ai_review_summary`（VARCHAR(300)，随文章级联删除）。两者均为**已建字段/索引**，无新表
+- **生成时机**：作者提交/重新提交审核时异步生成——`output_text` 写审计表（`runAndRecord`，`maxOutChars` 需留足 2000+），`summary` 覆盖写 `blog_posts.ai_review_summary`
+- **反查**：`blog_ai_usage` 已建索引 `idx_ai_usage_ref (ref_type, ref_id, type, id DESC)`，按文章取最新一条走索引无全表扫
+- **审核完成后无需清空**：详情永远取审计表最新一条，历史建议留档不误导；`ai_review_summary` 保留当前摘要即可
+- **降级**：AI 未配置、超时或解析失败 → 审计 `status=2` + `errorMessage`，审核页显示「AI 辅助不可用」，回退纯人工审核，不阻塞审核流程
 - **建议徽标映射**：`pass`→绿色「建议通过」、`reject`→红色「建议驳回」、`manual`→橙色「建议人工复核」；顶部始终标注「⚠ AI 建议仅供参考，最终由人工决定」
-- **审计**：异步生成时复用 `blog_ai_usage`（type=review_assist, ref_type=post, ref_id=文章id）；「后端已实现/接口是否就绪」以 `智能博客功能方案.md` 实施进度为准
+- **审计**：`blog_ai_usage`（type=review_assist, ref_type=post, ref_id=文章id）；「后端已实现/接口是否就绪」以 `智能博客功能方案.md` 实施进度为准
 
 ---
 
