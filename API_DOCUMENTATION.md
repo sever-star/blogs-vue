@@ -3005,6 +3005,92 @@ Authorization: Bearer {accessToken}   // 必需
 - 生成结果截断至 120 字以内；调用记入 `blog_ai_usage`（type=summary）
 - 前端写文章页在标题与摘要输入框旁均有「AI 生成」按钮，调用本组接口后回填，用户可再手动编辑
 
+### 10. AI 推荐标签
+
+> 作者写完正文，AI 一键推荐 3-5 个标签，丰富"创作三件套"（标题/摘要/标签分类）。返回**建议标签**，由用户确认后随文章提交，不自动落库。详见 `智能博客功能方案.md · 功能二`。
+
+**请求**
+
+```
+POST /ai/suggest-tags
+Content-Type: application/json
+Authorization: Bearer {accessToken}   // 必需
+```
+
+**入参（JSON）**
+
+| 字段      | 类型   | 必需 | 说明                                             |
+| --------- | ------ | ---- | ------------------------------------------------ |
+| title     | string | 否   | 文章标题，作为上下文辅助生成                     |
+| contentMd | string | 是   | 文章正文（Markdown），后端截断至 6000 字后送模型 |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "tags": ["Vue3", "组合式API", "SSE", "前端"]
+  }
+}
+```
+
+**错误情况**
+
+- 400: contentMd 为空
+- 401: 未登录（游客）；或 accessToken 过期/无效（业务码 401001 等），前端走 axios 自动刷新重试
+- 503: AI 服务未配置 Key、上游报错或超时
+
+**备注**
+
+- 模型按 prompt 输出逗号分隔的标签词，后端 `split("[,，]")` → trim → 去重 → 每个截断 8 字 → 取前 5（配置 `ai.max-suggest-tags`、`ai.suggest-tag-max-len`）
+- 标签若站内已有同名 `blog_tags`，文章提交时走既有"存在则复用 id、不存在则新建"逻辑
+- 每次调用（含失败）都记入 `blog_ai_usage` 审计表（type=tag_suggest，ref_type=post，ref_id 为空——生成时文章可能尚未落库）
+
+### 11. AI 推荐分类
+
+**请求**
+
+```
+POST /ai/suggest-category
+Content-Type: application/json
+Authorization: Bearer {accessToken}   // 必需
+```
+
+**入参（JSON）**
+
+| 字段      | 类型   | 必需 | 说明                                             |
+| --------- | ------ | ---- | ------------------------------------------------ |
+| title     | string | 否   | 文章标题，作为上下文辅助生成                     |
+| contentMd | string | 是   | 文章正文（Markdown），后端截断至 6000 字后送模型 |
+
+**返回**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "categoryId": 1,
+    "categoryName": "技术"
+  }
+}
+```
+
+**错误情况**
+
+- 400: contentMd 为空
+- 401: 未登录（游客）；或 accessToken 过期/无效
+- 503: AI 服务未配置 Key、上游报错或超时
+
+**备注**
+
+- **分类必须从站内现有分类中选**：后端把全量分类（id:name）拼入 prompt，让模型只输出数字 id——避免模型编出不存在的分类名
+- 返回的 id 经过后端校验（存在才返回）；模型输出解析失败/越界/分类不存在时 `categoryId=null`，让用户自选
+- 前端写文章页分类选择器旁「AI 推荐分类」按钮：成功则自动选中对应分类，`categoryId` 为空则提示用户手动选择
+- 每次调用（含失败）都记入 `blog_ai_usage` 审计表（type=category_suggest，ref_type=post，ref_id 为空）
+
 ---
 
 ## 文章相关接口（补充）
