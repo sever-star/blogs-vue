@@ -870,8 +870,9 @@ Authorization: Bearer {accessToken}
 
 **备注**
 
-- **分层存储**：完整建议 → `blog_ai_usage`（append-only，每次重新提交审核**追加**新记录，历史建议全部可回溯）；展示摘要 → `blog_posts.ai_review_summary`（VARCHAR(300)，随文章级联删除）。两者均为**已建字段/索引**，无新表
-- **生成时机**：作者提交/重新提交审核时异步生成——`output_text` 写审计表（`runAndRecord`，`maxOutChars` 需留足 2000+），`summary` 覆盖写 `blog_posts.ai_review_summary`
+- **列优先存储**（避免列与 JSON 重复）：`blog_ai_usage` 已有对应列的直接存列——`status/model/tokens/error_message/created_at`（后端 `runAndRecord` 本就写列）；**表里没有的**五个审核维度 `complianceScore/sensitiveWords/qualityScore/plagiarismHint/suggestion` 才序列化进 `output_text`；`summary` 单独存 `blog_posts.ai_review_summary`。`maxOutChars` 留 1000+ 即可
+- **分层存储**：完整审核记录 → `blog_ai_usage`（append-only，每次重新提交审核**追加**新记录，历史建议全部可回溯）；展示摘要 → `blog_posts.ai_review_summary`（VARCHAR(300)，随文章级联删除）。两者均为**已建字段/索引**，无新表
+- **生成时机**：作者提交/重新提交审核时异步生成——列 + `output_text` 写审计表，`summary` 覆盖写 `blog_posts.ai_review_summary`
 - **反查**：`blog_ai_usage` 已建索引 `idx_ai_usage_ref (ref_type, ref_id, type, id DESC)`，按文章取最新一条走索引无全表扫
 - **审核完成后无需清空**：详情永远取审计表最新一条，历史建议留档不误导；`ai_review_summary` 保留当前摘要即可
 - **降级**：AI 未配置、超时或解析失败 → 审计 `status=2` + `errorMessage`，审核页显示「AI 辅助不可用」，回退纯人工审核，不阻塞审核流程
