@@ -2,7 +2,7 @@
   <footer class="site-footer">
     <div class="footer-container">
       <div class="footer-brand">
-        <span class="brand-name">个人博客</span>
+        <span class="brand-name">岛屿博客</span>
         <span class="brand-slogan">记录学习与思考</span>
       </div>
 
@@ -14,7 +14,7 @@
       </nav>
 
       <div class="footer-copyright">
-        © {{ year }} 个人博客 · Powered by Vue 3
+        © {{ year }} 岛屿博客 · Powered by Vue 3
       </div>
     </div>
   </footer>

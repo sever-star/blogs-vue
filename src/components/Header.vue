@@ -4,9 +4,9 @@
       <!-- Logo -->
       <router-link to="/" class="logo-section">
         <div class="logo-box">
-          <span class="logo-text">Bo</span>
+          <span class="logo-text">岛</span>
         </div>
-        <span class="blog-name">我的博客</span>
+        <span class="blog-name">岛屿博客</span>
       </router-link>
 
       <!-- Navigation -->
