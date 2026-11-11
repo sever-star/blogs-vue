@@ -112,6 +112,26 @@ export interface PostRevision extends PostRevisionListItem {
   categoryId: number | null
 }
 
+// ============ AI 审核辅助 ============
+
+/** 文章 AI 审核建议（GET /posts/reviews/{postId}/ai-aid） */
+export interface AiReviewAid {
+  /** 0=生成中 1=成功 2=未生成/失败 */
+  status: number
+  /** 合规分 0-100（越高越合规） */
+  complianceScore?: number | null
+  /** 命中的敏感词列表（无则空数组） */
+  sensitiveWords?: string[]
+  /** 质量分 0-100 */
+  qualityScore?: number | null
+  /** 疑似抄袭/拼凑迹象（无则 null） */
+  plagiarismHint?: string | null
+  /** AI 一句话总体评价 */
+  summary?: string | null
+  /** 审核建议：pass/reject/manual */
+  suggestion?: 'pass' | 'reject' | 'manual' | '' | null
+}
+
 // ============ 评论 ============
 
 /** 评论 */

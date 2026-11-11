@@ -76,6 +76,84 @@
             {{ tag.name }}
           </el-tag>
         </div>
+
+        <!-- AI 审核参考面板：status 驱动三态展示（生成中/成功/不可用） -->
+        <div v-if="aiAid" class="ai-review-box">
+          <div class="ai-review-header">
+            <span class="ai-review-title">🤖 AI 审核参考</span>
+            <el-button
+              v-if="aiAid.status === 0"
+              size="small"
+              link
+              type="primary"
+              :loading="aiLoading"
+              @click="fetchAiReview(true)"
+            >
+              刷新
+            </el-button>
+          </div>
+
+          <!-- 0 生成中：显示分析中 + 刷新按钮 -->
+          <div v-if="aiAid.status === 0" class="ai-review-state">
+            <el-icon class="is-loading" style="margin-right: 6px"><Loading /></el-icon>
+            AI 正在分析中…（可点击右上角刷新）
+          </div>
+
+          <!-- 2 未生成/失败：不可用，无刷新按钮 -->
+          <el-empty v-else-if="aiAid.status === 2" description="AI 辅助不可用" :image-size="48" class="ai-review-empty" />
+
+          <!-- 1 成功：渲染完整建议 -->
+          <template v-else>
+            <div class="ai-review-scores">
+              <div class="ai-score-item">
+                <span class="score-label">合规分</span>
+                <el-progress
+                  :percentage="aiAid.complianceScore ?? 0"
+                  :stroke-width="10"
+                  :color="scoreColor(aiAid.complianceScore ?? 0)"
+                />
+              </div>
+              <div class="ai-score-item">
+                <span class="score-label">质量分</span>
+                <el-progress
+                  :percentage="aiAid.qualityScore ?? 0"
+                  :stroke-width="10"
+                  :color="scoreColor(aiAid.qualityScore ?? 0)"
+                />
+              </div>
+            </div>
+
+            <div v-if="sensitiveWordList.length" class="ai-review-line">
+              <span class="line-label">敏感词</span>
+              <el-tag
+                v-for="w in sensitiveWordList"
+                :key="w"
+                size="small"
+                type="danger"
+                effect="plain"
+                class="ai-tag"
+              >
+                {{ w }}
+              </el-tag>
+            </div>
+
+            <div v-if="aiAid.plagiarismHint" class="ai-review-line ai-plagiarism">
+              <span class="line-label">抄袭提示</span>
+              <span class="line-text">{{ aiAid.plagiarismHint }}</span>
+            </div>
+
+            <div v-if="aiAid.summary" class="ai-review-summary">{{ aiAid.summary }}</div>
+
+            <div v-if="aiAid.suggestion" class="ai-suggestion">
+              <el-tag :type="suggestionMeta(aiAid.suggestion).type" size="small" effect="light">
+                {{ suggestionMeta(aiAid.suggestion).label }}
+              </el-tag>
+            </div>
+          </template>
+
+          <div class="ai-review-warn">⚠ AI 建议仅供参考，最终由人工决定</div>
+        </div>
+
         <div v-if="detailRow?.summary" class="detail-summary">{{ detailRow.summary }}</div>
         <!-- MdPreview 只认 modelValue，:text 不是合法 prop（会被忽略导致正文空白） -->
         <MDPreview v-if="detail?.contentMd" :model-value="detail.contentMd" preview-only />
@@ -105,12 +183,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Loading } from '@element-plus/icons-vue'
 import { MdPreview as MDPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
-import { getPendingArticles, getArticleById, approveArticle, rejectArticle } from '@/api/article'
-import type { Article, ArticleListItem } from '@/types'
+import { getPendingArticles, getArticleById, approveArticle, rejectArticle, getAiReviewAid } from '@/api/article'
+import type { Article, ArticleListItem, AiReviewAid } from '@/types'
 
 const loading = ref(false)
 const actingId = ref<number | null>(null)
@@ -125,11 +204,19 @@ const detailLoading = ref(false)
 const detailRow = ref<ArticleListItem | null>(null)
 const detail = ref<Article | null>(null)
 
-/** 打开详情：列表行不含正文，需单独拉 GET /posts/{id} */
+// ---- AI 审核建议（status：0 生成中 / 1 成功 / 2 不可用） ----
+const aiAid = ref<AiReviewAid | null>(null)
+const aiLoading = ref(false)
+let aiPollTimer: ReturnType<typeof setInterval> | null = null
+
+/** 打开详情：列表行不含正文，需单独拉 GET /posts/{id} + AI 审核建议 */
 function openDetail(row: ArticleListItem) {
   detailRow.value = row
   detail.value = null
   detailVisible.value = true
+  // AI 面板：只拉一次当前状态（轮询由 status=0 触发）
+  aiAid.value = null
+  fetchAiReview()
   detailLoading.value = true
   getArticleById(row.id)
     .then((article) => {
@@ -143,10 +230,90 @@ function openDetail(row: ArticleListItem) {
     })
 }
 
+/**
+ * 拉取 AI 审核建议；status=0（生成中）时自动轮询直到非 0 或达到上限。
+ * @param manual 手动点击刷新（重置计数）
+ */
+async function fetchAiReview(manual = false) {
+  if (!detailRow.value) return
+  if (manual) stopAiPoll()
+  aiLoading.value = true
+  try {
+    const aid = await getAiReviewAid(detailRow.value.id)
+    aiAid.value = aid
+    if (aid.status === 0) {
+      startAiPoll(detailRow.value.id)
+    } else {
+      stopAiPoll()
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载 AI 审核建议失败')
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+/** 轮询：每 3s 一次，共 10 次；status 非 0 即停（switch 计数无需清 timer 计次） */
+function startAiPoll(postId: number) {
+  stopAiPoll()
+  let count = 0
+  aiPollTimer = setInterval(async () => {
+    count++
+    if (count > 10) {
+      stopAiPoll()
+      return
+    }
+    try {
+      const aid = await getAiReviewAid(postId)
+      aiAid.value = aid
+      if (aid.status !== 0) {
+        stopAiPoll()
+      }
+    } catch {
+      stopAiPoll()
+    }
+  }, 3000)
+}
+
+function stopAiPoll() {
+  if (aiPollTimer) {
+    clearInterval(aiPollTimer)
+    aiPollTimer = null
+  }
+}
+
 function resetDetail() {
   detailRow.value = null
   detail.value = null
+  aiAid.value = null
+  stopAiPoll()
 }
+
+/** 敏感词可能由后端返回数组；NaN/缺省时兜底空数组 */
+const sensitiveWordList = computed(() => aiAid.value?.sensitiveWords ?? [])
+
+/** 分数 → 颜色（越高越合规/质量越好） */
+function scoreColor(score: number) {
+  if (score >= 80) return '#67c23a'
+  if (score >= 60) return '#e6a23c'
+  return '#f56c6c'
+}
+
+/** 建议 → 标签（pass/reject/manual） */
+function suggestionMeta(suggestion: string) {
+  switch (suggestion) {
+    case 'pass':
+      return { label: '建议通过', type: 'success' as const }
+    case 'reject':
+      return { label: '建议驳回', type: 'danger' as const }
+    case 'manual':
+      return { label: '建议人工复核', type: 'warning' as const }
+    default:
+      return { label: '', type: 'info' as const }
+  }
+}
+
+onBeforeUnmount(stopAiPoll)
 
 /** 加载当前页待审核文章（审核最后一篇后自动回退一页） */
 async function loadPending() {
@@ -320,5 +487,107 @@ onMounted(loadPending)
   font-size: 13px;
   color: #4b5563;
   line-height: 1.6;
+}
+
+/* ---- AI 审核参考面板 ---- */
+.ai-review-box {
+  margin-bottom: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #fbfdff;
+}
+
+.ai-review-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.ai-review-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.ai-review-state {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: #909399;
+  padding: 6px 0;
+}
+
+.ai-review-empty {
+  padding: 8px 0;
+}
+
+.ai-review-scores {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ai-score-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.score-label {
+  flex-shrink: 0;
+  width: 44px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.ai-review-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.line-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #909399;
+  margin-top: 2px;
+}
+
+.ai-tag {
+  margin-right: 4px;
+}
+
+.ai-plagiarism .line-text {
+  color: #b45309;
+}
+
+.ai-review-summary {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  border-left: 3px solid #409eff;
+  border-radius: 0 4px 4px 0;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.ai-suggestion {
+  margin-top: 8px;
+}
+
+.ai-review-warn {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #e5e7eb;
+  font-size: 12px;
+  color: #f56c6c;
 }
 </style>

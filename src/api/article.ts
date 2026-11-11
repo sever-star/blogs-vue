@@ -1,5 +1,5 @@
 import client from './client'
-import type { Article, ArticleListItem, Tag, Category, ArticleQueryParams, ArticlePayload, PageQuery, PaginatedResponse, PostRevision, PostRevisionListItem } from '@/types'
+import type { Article, ArticleListItem, Tag, Category, ArticleQueryParams, ArticlePayload, PageQuery, PaginatedResponse, PostRevision, PostRevisionListItem, AiReviewAid } from '@/types'
 
 export type { ArticleQueryParams, ArticlePayload, PageQuery, PaginatedResponse }
 
@@ -192,4 +192,15 @@ export const getPostRevision = async (id: number, revId: number): Promise<PostRe
  */
 export const rollbackPostRevision = async (id: number, revId: number): Promise<Article> => {
   return client.post(`/posts/${id}/revisions/${revId}/rollback`)
+}
+
+/**
+ * 获取文章 AI 审核建议（仅管理员；作者提交审核时异步生成）
+ * 返回结构：{ status, complianceScore, sensitiveWords, qualityScore,
+ *            plagiarismHint, summary, suggestion }
+ * status：0=生成中 1=成功 2=未生成/失败
+ * GET /posts/reviews/{postId}/ai-aid
+ */
+export const getAiReviewAid = async (postId: number): Promise<AiReviewAid> => {
+  return client.get(`/posts/reviews/${postId}/ai-aid`)
 }
