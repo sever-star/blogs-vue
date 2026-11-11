@@ -155,9 +155,11 @@
         </div>
 
         <div v-if="detailRow?.summary" class="detail-summary">{{ detailRow.summary }}</div>
-        <!-- MdPreview 只认 modelValue，:text 不是合法 prop（会被忽略导致正文空白） -->
-        <MDPreview v-if="detail?.contentMd" :model-value="detail.contentMd" preview-only />
-        <el-empty v-else-if="!detailLoading" description="正文加载失败" />
+        <!-- MdPreview 只认 modelValue，:text 不是合法 prop（会被忽略导致正文空白）；
+             懒渲染：弹窗动画结束后（previewReady）才挂载，避免与开启动画抢主线程造成卡顿 -->
+        <MDPreview v-if="previewReady && detail?.contentMd" :model-value="detail.contentMd" preview-only />
+        <el-empty v-else-if="!detailLoading && !previewReady" description="正文加载中…" />
+        <el-empty v-else-if="!detailLoading && previewReady" description="正文加载失败" />
       </div>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
@@ -183,7 +185,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import { MdPreview as MDPreview } from 'md-editor-v3'
@@ -203,20 +205,27 @@ const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detailRow = ref<ArticleListItem | null>(null)
 const detail = ref<Article | null>(null)
+/** 正文懒渲染标记：弹窗动画完成后才置 true，避免与开启动画抢主线程造成卡顿 */
+const previewReady = ref(false)
 
 // ---- AI 审核建议（status：0 生成中 / 1 成功 / 2 不可用） ----
 const aiAid = ref<AiReviewAid | null>(null)
 const aiLoading = ref(false)
 let aiPollTimer: ReturnType<typeof setInterval> | null = null
 
-/** 打开详情：列表行不含正文，需单独拉 GET /posts/{id} + AI 审核建议 */
+/**
+ * 打开详情：列表行不含正文，需单独拉 GET /posts/{id} + AI 审核建议。
+ * 打开时只拉一次 AI 建议、不自动轮询（轮询仅由手动刷新触发），
+ * 避免管理员反复开详情时产生持续后台请求造成卡顿。
+ */
 function openDetail(row: ArticleListItem) {
   detailRow.value = row
   detail.value = null
+  previewReady.value = false
   detailVisible.value = true
-  // AI 面板：只拉一次当前状态（轮询由 status=0 触发）
+  // AI 面板：只拉一次当前状态（不自动轮询；生成中时靠右上角「刷新」按钮手动轮询）
   aiAid.value = null
-  fetchAiReview()
+  fetchAiReview(false)
   detailLoading.value = true
   getArticleById(row.id)
     .then((article) => {
@@ -227,12 +236,19 @@ function openDetail(row: ArticleListItem) {
     })
     .finally(() => {
       detailLoading.value = false
+      // 正文渲染延后到弹窗动画结束后，避免与弹窗开启动画抢主线程造成卡顿
+      nextTick(() => {
+        setTimeout(() => {
+          previewReady.value = true
+        }, 120)
+      })
     })
 }
 
 /**
- * 拉取 AI 审核建议；status=0（生成中）时自动轮询直到非 0 或达到上限。
- * @param manual 手动点击刷新（重置计数）
+ * 拉取 AI 审核建议；轮询仅由手动刷新触发（manual=true），
+ * 打开详情时（manual=false）不自动轮询，减少后台请求。
+ * @param manual 是否手动点击刷新按钮
  */
 async function fetchAiReview(manual = false) {
   if (!detailRow.value) return
@@ -241,7 +257,8 @@ async function fetchAiReview(manual = false) {
   try {
     const aid = await getAiReviewAid(detailRow.value.id)
     aiAid.value = aid
-    if (aid.status === 0) {
+    if (manual && aid.status === 0) {
+      // 仅手动刷新后、且仍在生成中，才启动轮询；生成结束或超限即停
       startAiPoll(detailRow.value.id)
     } else {
       stopAiPoll()
@@ -253,7 +270,7 @@ async function fetchAiReview(manual = false) {
   }
 }
 
-/** 轮询：每 3s 一次，共 10 次；status 非 0 即停（switch 计数无需清 timer 计次） */
+/** 轮询：每 3s 一次，共 10 次；status 非 0 即停 */
 function startAiPoll(postId: number) {
   stopAiPoll()
   let count = 0
@@ -286,6 +303,7 @@ function resetDetail() {
   detailRow.value = null
   detail.value = null
   aiAid.value = null
+  previewReady.value = false
   stopAiPoll()
 }
 
