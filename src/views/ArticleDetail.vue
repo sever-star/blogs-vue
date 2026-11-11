@@ -74,33 +74,6 @@
             <MDPreview :model-value="articleStore.currentArticle.contentMd" preview-only />
           </div>
 
-          <!-- 相关阅读：item-based 协同过滤 + 多级回退（新标签页打开） -->
-          <div v-if="relatedPosts.length" class="related-section">
-            <h3 class="related-title">相关阅读</h3>
-            <div class="related-list">
-              <a
-                v-for="p in relatedPosts"
-                :key="p.id"
-                :href="relatedHref(p.id)"
-                target="_blank"
-                rel="noopener"
-                class="related-item"
-              >
-                <img v-if="p.coverImage" :src="p.coverImage" alt="" loading="lazy" class="related-cover" />
-                <div class="related-info">
-                  <span class="related-item-title">{{ p.title }}</span>
-                  <span v-if="p.summary" class="related-item-summary">{{ p.summary }}</span>
-                  <span class="related-item-meta">
-                    {{ p.authorNickname }}
-                    <el-tag size="small" effect="plain" class="reason-tag">
-                      {{ reasonLabel(p.reason) }}
-                    </el-tag>
-                  </span>
-                </div>
-              </a>
-            </div>
-          </div>
-
           <!-- 文章下方评论区：首页文章列表同款（默认 5 条 + 查看全部评论后无限加载） -->
           <CommentSection :article-id="articleId" :author-id="articleStore.currentArticle?.userId ?? null" variant="inline" class="below-comments" />
         </article>
@@ -182,6 +155,33 @@
             <el-button size="small" plain @click="handleMessage">私信</el-button>
           </div>
         </el-card>
+
+        <!-- 相关阅读：item-based 协同过滤 + 多级回退（新标签页打开） -->
+        <div v-if="relatedPosts.length" class="related-section">
+          <h3 class="related-title">相关阅读</h3>
+          <div class="related-list">
+            <a
+              v-for="p in relatedPosts"
+              :key="p.id"
+              :href="relatedHref(p.id)"
+              target="_blank"
+              rel="noopener"
+              class="related-item"
+            >
+              <img v-if="p.coverImage" :src="p.coverImage" alt="" loading="lazy" class="related-cover" />
+              <div class="related-info">
+                <span class="related-item-title">{{ p.title }}</span>
+                <span v-if="p.summary" class="related-item-summary">{{ p.summary }}</span>
+                <span class="related-item-meta">
+                  {{ p.authorNickname }}
+                  <el-tag size="small" effect="plain" class="reason-tag">
+                    {{ reasonLabel(p.reason) }}
+                  </el-tag>
+                </span>
+              </div>
+            </a>
+          </div>
+        </div>
       </aside>
     </div>
 
@@ -1005,13 +1005,11 @@ article {
 
 /* ---- 相关阅读（功能四） ---- */
 .related-section {
-  margin-top: 28px;
-  padding-top: 20px;
-  border-top: 1px solid #ebeef5;
+  margin-top: 16px;
 }
 
 .related-title {
-  margin: 0 0 14px;
+  margin: 0 0 12px;
   font-size: 16px;
   font-weight: 600;
   color: #1f2937;
@@ -1020,13 +1018,14 @@ article {
 .related-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
+/* 侧栏窄列：卡片纵向堆叠（封面在上、文字在下） */
 .related-item {
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 8px;
   padding: 10px 12px;
   border: 1px solid #f0f0f0;
   border-radius: 6px;
@@ -1041,9 +1040,8 @@ article {
 }
 
 .related-cover {
-  flex-shrink: 0;
-  width: 96px;
-  height: 60px;
+  width: 100%;
+  height: 96px;
   object-fit: cover;
   border-radius: 4px;
   border: 1px solid #e5e7eb;
@@ -1058,12 +1056,14 @@ article {
 }
 
 .related-item-title {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: #1f2937;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .related-item .related-item-title:hover {
@@ -1071,7 +1071,7 @@ article {
 }
 
 .related-item-summary {
-  font-size: 12px;
+  font-size: 13px;
   color: #6b7280;
   line-height: 1.5;
   display: -webkit-box;
@@ -1084,7 +1084,7 @@ article {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   color: #9ca3af;
 }
 
