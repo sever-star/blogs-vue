@@ -200,7 +200,23 @@ export const rollbackPostRevision = async (id: number, revId: number): Promise<A
  *            plagiarismHint, summary, suggestion }
  * status：0=生成中 1=成功 2=未生成/失败
  * GET /posts/reviews/{postId}/ai-aid
+ *
+ * 后端把模型输出的下划线 JSON 原样透传（compliance_score/quality_score/
+ * sensitive_words/plagiarism_hint），这里统一映射成前端驼峰命名。
  */
 export const getAiReviewAid = async (postId: number): Promise<AiReviewAid> => {
-  return client.get(`/posts/reviews/${postId}/ai-aid`)
+  const raw = await client.get<Record<string, unknown>>(`/posts/reviews/${postId}/ai-aid`)
+  const num = (v: unknown): number | null =>
+    typeof v === 'number' || typeof v === 'string' ? Number(v) : null
+  return {
+    status: Number(raw?.status ?? 2),
+    complianceScore: num(raw.compliance_score ?? raw.complianceScore),
+    qualityScore: num(raw.quality_score ?? raw.qualityScore),
+    sensitiveWords: Array.isArray(raw.sensitive_words ?? raw.sensitiveWords)
+      ? (raw.sensitive_words ?? raw.sensitiveWords) as string[]
+      : [],
+    plagiarismHint: String(raw.plagiarism_hint ?? raw.plagiarismHint ?? ''),
+    summary: String(raw.summary ?? ''),
+    suggestion: (raw.suggestion as AiReviewAid['suggestion']) ?? '',
+  }
 }
