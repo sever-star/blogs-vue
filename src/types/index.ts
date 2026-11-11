@@ -19,8 +19,8 @@ export interface User {
   github: string
   weibo: string
   status: number
-  /** 角色：ADMIN=管理员，USER=普通用户 */
-  role: 'ADMIN' | 'USER'
+  /** 角色：ADMIN=管理员，USER=普通用户，NEW_USER=新注册受限用户（AI 生成等能力禁用，管理员可升级） */
+  role: 'ADMIN' | 'USER' | 'NEW_USER'
   lastLoginAt: string | null
   createdAt: string
   updatedAt: string

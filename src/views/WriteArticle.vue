@@ -336,6 +336,20 @@ const generatingSummary = ref(false);
 const suggestingTags = ref(false);
 const suggestingCategory = ref(false);
 
+/** 新注册受限用户（NEW_USER）：AI 生成类功能禁用，需管理员升级为普通用户 */
+const isNewUser = computed(
+  () => (authStore.user?.role ?? "") === "NEW_USER"
+);
+
+/** AI 生成按钮统一入口守卫：受限用户点按钮只提示、不发起请求（后端同样 403 拦截） */
+function guardAiAccess(): boolean {
+  if (isNewUser.value) {
+    ElMessage.warning("新注册用户暂不可使用 AI 生成功能，请联系管理员升级");
+    return false;
+  }
+  return true;
+}
+
 /** 正文太短时模型无意义，给个兜底提示而非空跑一次计费调用 */
 function requireEnoughContent(): string | null {
   const content = formData.value.content.trim();
@@ -348,6 +362,7 @@ function requireEnoughContent(): string | null {
 
 /** AI 生成标题：用正文作输入，结果填回标题框，用户可再编辑 */
 async function handleGenerateTitle() {
+  if (!guardAiAccess()) return;
   const content = requireEnoughContent();
   if (!content) return;
   generatingTitle.value = true;
@@ -362,6 +377,7 @@ async function handleGenerateTitle() {
 
 /** AI 生成摘要：可带标题作上下文，结果填回摘要框 */
 async function handleGenerateSummary() {
+  if (!guardAiAccess()) return;
   const content = requireEnoughContent();
   if (!content) return;
   generatingSummary.value = true;
@@ -383,6 +399,7 @@ async function handleGenerateSummary() {
  * 提交时 resolveTagIds 直接复用已有 id，不会触发 createTag。
  */
 async function handleSuggestTags() {
+  if (!guardAiAccess()) return;
   const content = requireEnoughContent();
   if (!content) return;
   suggestingTags.value = true;
@@ -415,6 +432,7 @@ async function handleSuggestTags() {
 
 /** AI 推荐分类：只从站内现有分类中选；categoryId 为空时提示手动选择 */
 async function handleSuggestCategory() {
+  if (!guardAiAccess()) return;
   const content = requireEnoughContent();
   if (!content) return;
   suggestingCategory.value = true;

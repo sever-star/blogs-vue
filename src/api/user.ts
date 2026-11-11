@@ -3,8 +3,8 @@ import type { User, PageQuery, PaginatedResponse } from '@/types'
 
 export type { User, PageQuery, PaginatedResponse }
 
-/** 用户角色 */
-export type UserRole = 'ADMIN' | 'USER'
+/** 用户角色：NEW_USER=新注册受限用户（AI 生成等能力禁用，管理员可升级为 USER） */
+export type UserRole = 'ADMIN' | 'USER' | 'NEW_USER'
 
 /** 用户主页统计：文章数 / 获赞数 / 浏览量 / 粉丝数 */
 export interface UserStats {

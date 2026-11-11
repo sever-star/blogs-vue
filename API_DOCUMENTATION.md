@@ -3020,6 +3020,7 @@ Authorization: Bearer {accessToken}   // 必需
 
 - 400: contentMd 为空
 - 401: 未登录（游客）；或 accessToken 过期/无效（业务码 401001 等），前端走 axios 自动刷新重试
+- 403: 新注册受限用户（`NEW_USER`）不可使用 AI 生成——防新号刷 token 资源，需管理员在「用户管理」把角色升级为普通用户
 - 503: AI 服务未配置 Key、上游报错或超时
 
 **备注**
@@ -3060,6 +3061,7 @@ Authorization: Bearer {accessToken}   // 必需
 
 - 400: contentMd 为空
 - 401: 未登录（游客）；或 accessToken 过期/无效
+- 403: 新注册受限用户（`NEW_USER`）不可使用 AI 生成——防新号刷 token 资源，需管理员在「用户管理」把角色升级为普通用户
 - 503: AI 服务未配置 Key、上游报错或超时
 
 **备注**
@@ -3112,6 +3114,7 @@ Authorization: Bearer {accessToken}   // 必需
 
 - 400: contentMd 为空
 - 401: 未登录（游客）；或 accessToken 过期/无效（业务码 401001 等），前端走 axios 自动刷新重试
+- 403: 新注册受限用户（`NEW_USER`）不可使用 AI 生成——防新号刷 token 资源，需管理员在「用户管理」把角色升级为普通用户
 - 503: AI 服务未配置 Key、上游报错或超时
 
 **备注**
@@ -3154,6 +3157,7 @@ Authorization: Bearer {accessToken}   // 必需
 
 - 400: contentMd 为空
 - 401: 未登录（游客）；或 accessToken 过期/无效
+- 403: 新注册受限用户（`NEW_USER`）不可使用 AI 生成——防新号刷 token 资源，需管理员在「用户管理」把角色升级为普通用户
 - 503: AI 服务未配置 Key、上游报错或超时
 
 **备注**

@@ -37,6 +37,8 @@
             >
               <el-option label="管理员" value="ADMIN" />
               <el-option label="普通用户" value="USER" />
+              <!-- 新注册默认档：受限（AI 生成禁用），管理员将其升为普通用户即解除 -->
+              <el-option label="受限用户（新注册）" value="NEW_USER" />
             </el-select>
           </template>
         </el-table-column>
@@ -159,14 +161,26 @@ function handleReset() {
   loadUsers();
 }
 
+/** 角色显示名（确认弹窗用） */
+function roleLabel(role: string): string {
+  switch (role) {
+    case "ADMIN":
+      return "管理员"
+    case "NEW_USER":
+      return "受限用户（新注册）"
+    default:
+      return "普通用户"
+  }
+}
+
 /**
  * 修改角色。el-select 用 :model-value 受控——确认并更新成功前
  * 显示不随选择变化，取消或失败无需回滚显示。
  */
 async function handleRoleChange(row: User, newRole: UserRole) {
   if (newRole === row.role || pendingId.value !== null) return;
-  const oldLabel = row.role === "ADMIN" ? "管理员" : "普通用户";
-  const newLabel = newRole === "ADMIN" ? "管理员" : "普通用户";
+  const oldLabel = roleLabel(row.role);
+  const newLabel = roleLabel(newRole);
   try {
     await ElMessageBox.confirm(
       `确定将用户「${row.username}」的角色从${oldLabel}改为${newLabel}吗？`,
