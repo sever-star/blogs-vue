@@ -1,5 +1,5 @@
 import client from './client'
-import type { Article, ArticleListItem, Tag, Category, ArticleQueryParams, ArticlePayload, PageQuery, PaginatedResponse, PostRevision, PostRevisionListItem, AiReviewAid } from '@/types'
+import type { Article, ArticleListItem, Tag, Category, ArticleQueryParams, ArticlePayload, PageQuery, PaginatedResponse, PostRevision, PostRevisionListItem, AiReviewAid, RelatedPost } from '@/types'
 
 export type { ArticleQueryParams, ArticlePayload, PageQuery, PaginatedResponse }
 
@@ -219,4 +219,13 @@ export const getAiReviewAid = async (postId: number): Promise<AiReviewAid> => {
     summary: String(raw.summary ?? ''),
     suggestion: (raw.suggestion as AiReviewAid['suggestion']) ?? '',
   }
+}
+
+/**
+ * 获取相关文章推荐（公开）
+ * item-based 协同过滤 + 多级回退（同标签 → 同分类 → 全站热门）
+ * GET /posts/{id}/related?limit=6
+ */
+export const getRelatedArticles = async (id: number, limit = 6): Promise<RelatedPost[]> => {
+  return client.get(`/posts/${id}/related`, { params: { limit } })
 }

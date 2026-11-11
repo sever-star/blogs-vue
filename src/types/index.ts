@@ -114,6 +114,17 @@ export interface PostRevision extends PostRevisionListItem {
 
 // ============ AI 审核辅助 ============
 
+/** 相关文章推荐项（GET /posts/{id}/related） */
+export interface RelatedPost {
+  id: number
+  title: string
+  summary: string
+  coverImage: string
+  authorNickname: string
+  /** 推荐理由：cf=读者同好 / tag=同标签 / category=同分类 / hot=全站热门 */
+  reason: 'cf' | 'tag' | 'category' | 'hot' | string
+}
+
 /** 文章 AI 审核建议（GET /posts/reviews/{postId}/ai-aid） */
 export interface AiReviewAid {
   /** 0=生成中 1=成功 2=未生成/失败 */

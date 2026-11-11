@@ -74,6 +74,33 @@
             <MDPreview :model-value="articleStore.currentArticle.contentMd" preview-only />
           </div>
 
+          <!-- 相关阅读：item-based 协同过滤 + 多级回退（新标签页打开） -->
+          <div v-if="relatedPosts.length" class="related-section">
+            <h3 class="related-title">相关阅读</h3>
+            <div class="related-list">
+              <a
+                v-for="p in relatedPosts"
+                :key="p.id"
+                :href="relatedHref(p.id)"
+                target="_blank"
+                rel="noopener"
+                class="related-item"
+              >
+                <img v-if="p.coverImage" :src="p.coverImage" alt="" loading="lazy" class="related-cover" />
+                <div class="related-info">
+                  <span class="related-item-title">{{ p.title }}</span>
+                  <span v-if="p.summary" class="related-item-summary">{{ p.summary }}</span>
+                  <span class="related-item-meta">
+                    {{ p.authorNickname }}
+                    <el-tag size="small" effect="plain" class="reason-tag">
+                      {{ reasonLabel(p.reason) }}
+                    </el-tag>
+                  </span>
+                </div>
+              </a>
+            </div>
+          </div>
+
           <!-- 文章下方评论区：首页文章列表同款（默认 5 条 + 查看全部评论后无限加载） -->
           <CommentSection :article-id="articleId" :author-id="articleStore.currentArticle?.userId ?? null" variant="inline" class="below-comments" />
         </article>
@@ -190,6 +217,8 @@ import 'md-editor-v3/lib/preview.css'
 import { Star, StarFilled, ChatDotRound, User, Calendar, View, Edit, Close, DocumentCopy } from '@element-plus/icons-vue'
 import CommentSection from '@/components/CommentSection.vue'
 import { getFollowStatus, followUser, unfollowUser } from '@/api/follow'
+import { getRelatedArticles } from '@/api/article'
+import type { RelatedPost } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -216,6 +245,39 @@ const canOffline = computed(
 // 离开详情页（SPA 内返回）时恢复，避免文章标题残留到其他页面
 const previousTitle = document.title
 
+// ---- 相关阅读（功能四） ----
+const relatedPosts = ref<RelatedPost[]>([])
+
+/** 拉取相关文章；失败静默（推荐是锦上添花，不该影响正文展示） */
+async function loadRelated() {
+  try {
+    relatedPosts.value = await getRelatedArticles(articleId.value, 6)
+  } catch (e) {
+    relatedPosts.value = []
+  }
+}
+
+/** 相关文章跳转链接（新标签页打开，带路由 base） */
+function relatedHref(id: number): string {
+  return router.resolve({ name: 'ArticleDetail', params: { id } }).href
+}
+
+/** 推荐理由文案 */
+function reasonLabel(reason: string): string {
+  switch (reason) {
+    case 'cf':
+      return '读者同好'
+    case 'tag':
+      return '同标签'
+    case 'category':
+      return '同分类'
+    case 'hot':
+      return '全站热门'
+    default:
+      return '相关推荐'
+  }
+}
+
 onMounted(async () => {
   try {
     await articleStore.fetchArticleById(articleId.value)
@@ -223,6 +285,8 @@ onMounted(async () => {
     if (articleStore.currentArticle) {
       document.title = articleStore.currentArticle.title
     }
+    // 相关阅读：与正文并行拉取（不依赖正文成功）
+    loadRelated()
     // 详情页是公开路由，守卫不会等 ensureReady；这里显式等用户态恢复完成，
     // 否则新标签页打开时 user 尚未拉回、isLoggedIn 为 false，关注状态会被跳过
     await authStore.ensureReady()
@@ -937,5 +1001,94 @@ article {
     padding: 16px;
     font-size: 14px;
   }
+}
+
+/* ---- 相关阅读（功能四） ---- */
+.related-section {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid #ebeef5;
+}
+
+.related-title {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.related-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.related-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  background: #fff;
+  text-decoration: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.related-item:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 6px rgba(64, 158, 255, 0.15);
+}
+
+.related-cover {
+  flex-shrink: 0;
+  width: 96px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+}
+
+.related-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.related-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.related-item .related-item-title:hover {
+  color: #409eff;
+}
+
+.related-item-summary {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.related-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.reason-tag {
+  margin-left: 4px;
 }
 </style>
