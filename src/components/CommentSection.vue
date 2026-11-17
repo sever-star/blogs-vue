@@ -545,14 +545,14 @@ function formatCommentDate(dateString: string): string {
 
 .comment-input:focus {
   outline: none;
-  border-color: #1890ff;
+  border-color: var(--el-color-primary);
   box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1);
 }
 
 .submit-btn {
   align-self: flex-end;
   padding: 8px 24px;
-  background-color: #1890ff;
+  background-color: var(--el-color-primary);
   color: white;
   border: none;
   border-radius: 6px;
@@ -567,7 +567,7 @@ function formatCommentDate(dateString: string): string {
 }
 
 .submit-btn:disabled {
-  background-color: #bfdbfe;
+  background-color: var(--el-color-primary-light-8);
   cursor: not-allowed;
 }
 
@@ -711,7 +711,7 @@ function formatCommentDate(dateString: string): string {
 }
 
 .like-btn:hover {
-  color: #1890ff;
+  color: var(--el-color-primary);
 }
 
 /* 已点赞：实心星标 + 金色强调 */
@@ -738,7 +738,7 @@ function formatCommentDate(dateString: string): string {
 }
 
 .reply-action:hover {
-  color: #1890ff;
+  color: var(--el-color-primary);
 }
 
 .reply-actions {
@@ -838,7 +838,7 @@ function formatCommentDate(dateString: string): string {
 
 /* 子评论正文前的「回复 @X：」前缀 */
 .reply-to {
-  color: #1890ff;
+  color: var(--el-color-primary);
   font-weight: 600;
   margin-right: 2px;
 }
@@ -848,6 +848,6 @@ function formatCommentDate(dateString: string): string {
 }
 
 .login-prompt :deep(.el-button--link) {
-  color: #1890ff;
+  color: var(--el-color-primary);
 }
 </style>

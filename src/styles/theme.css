@@ -1,0 +1,45 @@
+/* ============================================================
+   岛屿博客 · 主题变量（方案 A「岛屿之蓝」）
+   所有海洋/沙滩配色集中在此，组件里只引用 --island-* 变量
+   ============================================================ */
+
+:root {
+  /* ---- 品牌渐变：天空蓝 → 海绿青 ---- */
+  --island-sky: #38bdf8;
+  --island-sea: #14b8a6;
+  --island-gradient: linear-gradient(135deg, #38bdf8, #14b8a6);
+
+  /* ---- Element Plus 主色接管（按钮 / 单选 / 链接 hover）---- */
+  --el-color-primary: #0ea5e9;
+  --el-color-primary-light-3: #4cb8ee;
+  --el-color-primary-light-5: #82cff4;
+  --el-color-primary-light-7: #b4e3f9;
+  --el-color-primary-light-8: #cdeefb;
+  --el-color-primary-light-9: #e6f6fe;
+  --el-color-primary-dark-2: #0c88c6;
+
+  /* ---- 珊瑚橙点缀（收藏/重点标签等，少量使用）---- */
+  --island-accent: #fb7185;
+  /* 沙滩沙色（极少量，如分割底色）*/
+  --island-sand: #fcd9b8;
+
+  /* ---- 背景：俯视海岸——海面(上) → 浅滩(中) → 沙滩(下) ---- */
+  --island-bg: linear-gradient(180deg, #dff4f6 0%, #edfaf7 260px, #fbf7f2 100%);
+
+  /* ---- 卡片与文字 ---- */
+  --island-card-border: #e2f0f2;
+  --island-text-title: #1f2937;
+  --island-text-body: #5b6b76;
+  --island-text-muted: #94a3ad;
+}
+
+/* 页面整体背景：海 → 沙滩 渐变，fixed 铺满不随滚动露出白边 */
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  background: var(--island-bg) fixed no-repeat;
+}

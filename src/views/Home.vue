@@ -104,7 +104,7 @@
             </div>
 
             <div v-else-if="articleStore.paginatedArticles.length === 0" class="no-articles">
-              <el-empty description="暂无文章" />
+              <el-empty description="这片海域还没有文章漂流过来 🌊" />
             </div>
 
             <div v-else class="articles-list">
@@ -337,7 +337,8 @@ function handleLoadMore() {
 <style scoped>
 .home {
   min-height: calc(100vh - 70px);
-  background-color: #f5f5f5;
+  /* 背景交给 body 的海→滩渐变（见 styles/theme.css） */
+  background: transparent;
   padding: 20px 0;
 }
 
@@ -406,8 +407,8 @@ function handleLoadMore() {
 
 .scroll-arrow:hover {
   background: #fff;
-  color: #3b82f6;
-  border-color: #3b82f6;
+  color: var(--el-color-primary);
+  border-color: var(--el-color-primary);
 }
 
 .scroll-arrow--left {
@@ -541,7 +542,7 @@ function handleLoadMore() {
 }
 
 .ranking-item:hover .rank-title {
-  color: #1890ff;
+  color: var(--el-color-primary);
 }
 
 .ranking-item:last-child {
@@ -564,7 +565,7 @@ function handleLoadMore() {
 
 .rank.top {
   color: #fff;
-  background: linear-gradient(135deg, #3b82f6, #9333ea);
+  background: var(--island-gradient);
 }
 
 .rank-info {

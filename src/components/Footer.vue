@@ -51,7 +51,8 @@ const year = new Date().getFullYear()
 .brand-name {
   font-size: 16px;
   font-weight: 600;
-  background: linear-gradient(135deg, #3b82f6, #9333ea);
+  /* 海洋渐变 → 渐变文字 */
+  background: var(--island-gradient);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -76,7 +77,7 @@ const year = new Date().getFullYear()
 }
 
 .footer-link:hover {
-  color: #3b82f6;
+  color: var(--el-color-primary);
 }
 
 .footer-copyright {

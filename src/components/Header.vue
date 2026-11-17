@@ -1,10 +1,18 @@
 <template>
   <header class="header-wrapper">
     <div class="header-container">
-      <!-- Logo -->
+      <!-- Logo：圆形小岛 + 棕榈树剪影 -->
       <router-link to="/" class="logo-section">
         <div class="logo-box">
-          <span class="logo-text">岛</span>
+          <svg viewBox="0 0 24 24" class="logo-svg" aria-hidden="true">
+            <!-- 岛体：圆润沙滩丘 -->
+            <path fill="rgba(255,255,255,0.96)" d="M4 15.2c1.6-2.4 3.8-3.4 8-3.4s6.4 1 8 3.4c.5.7.9 1.4 1 1.9 0 .4-.3.7-.7.7H3.7a.7.7 0 0 1-.7-.7c.1-.5.5-1.2 1-1.9Z" />
+            <!-- 棕榈树干 -->
+            <path fill="none" stroke="rgba(255,255,255,0.96)" stroke-width="1.3" stroke-linecap="round" d="M12 12c0-.8-1.4-4.6-1.4-5.8 0-1-.8-1.4-1.2-.9" />
+            <!-- 棕榈叶（三片） -->
+            <path fill="rgba(255,255,255,0.96)" stroke="none" d="M9.2 4.2c-1.8-.4-3.2.2-3 1.7.2 1.3 1.5 2 3 .9s2.2-2.1 0-2.6ZM10.4 7c-1.2 1.3-1.5 2.9-.4 3.9 1.1 1 2.7.4 3-1.1s-.7-3.4-2.6-2.8Z" />
+            <path fill="rgba(255,255,255,0.96)" stroke="none" d="M13.6 4.6c1.8-.6 3.3-.1 3.2 1.4-.1 1.3-1.4 2.1-3 1.1s-2-2.3-.2-2.5Z" />
+          </svg>
         </div>
         <span class="blog-name">岛屿博客</span>
       </router-link>
@@ -289,9 +297,21 @@ const handleCommand = (command: string) => {
   position: sticky;
   top: 0;
   z-index: 100;
-  background-color: #fff;
+  background-color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
   border-bottom: 1px solid #e5e7eb;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* 底部 3px 海浪线：天空蓝→海绿青 渐变波浪 */
+.header-wrapper::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  background: var(--island-gradient);
 }
 
 .header-container {
@@ -321,16 +341,17 @@ const handleCommand = (command: string) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #3b82f6, #9333ea);
+  width: 42px;
+  height: 42px;
+  /* 圆润小岛：圆形渐变底 + 白色岛形剪影 */
+  border-radius: 50%;
+  background: var(--island-gradient);
+  box-shadow: 0 3px 8px rgba(20, 184, 166, 0.35);
 }
 
-.logo-text {
-  color: #fff;
-  font-weight: bold;
-  font-size: 18px;
+.logo-svg {
+  width: 26px;
+  height: 26px;
 }
 
 .blog-name {
@@ -353,12 +374,12 @@ const handleCommand = (command: string) => {
 }
 
 .nav-link:hover {
-  color: #3b82f6;
+  color: var(--el-color-primary);
 }
 
 .nav-link.router-link-active {
-  color: #3b82f6;
-  border-bottom: 2px solid #3b82f6;
+  color: var(--el-color-primary);
+  border-bottom: 2px solid var(--el-color-primary);
   padding-bottom: 2px;
 }
 
@@ -420,7 +441,7 @@ const handleCommand = (command: string) => {
 }
 
 .bell-btn:hover {
-  color: #3b82f6;
+  color: var(--el-color-primary);
 }
 
 /* 悬浮弹层：五个分类快捷入口 */
@@ -443,7 +464,7 @@ const handleCommand = (command: string) => {
 
 .notif-quick-item:hover {
   background: #f3f4f6;
-  color: #3b82f6;
+  color: var(--el-color-primary);
 }
 
 .quick-arrow {
@@ -467,7 +488,7 @@ const handleCommand = (command: string) => {
 }
 
 .notif-quick-item:hover .quick-arrow {
-  color: #3b82f6;
+  color: var(--el-color-primary);
 }
 
 /* 下拉面板内的用户信息区 */

@@ -609,7 +609,7 @@ onMounted(async () => {
 }
 
 .session-item.active .session-title {
-  color: #3b82f6;
+  color: var(--el-color-primary);
   font-weight: 500;
 }
 
@@ -619,7 +619,7 @@ onMounted(async () => {
 }
 
 .session-item.active .session-icon {
-  color: #3b82f6;
+  color: var(--el-color-primary);
 }
 
 .session-title {
@@ -691,7 +691,7 @@ onMounted(async () => {
 .chat-status {
   margin-left: auto;
   font-size: 12px;
-  color: #3b82f6;
+  color: var(--el-color-primary);
 }
 
 .config-alert {
@@ -721,7 +721,7 @@ onMounted(async () => {
   border-radius: 14px;
   font-size: 24px;
   color: #fff;
-  background: linear-gradient(135deg, #3b82f6, #9333ea);
+  background: var(--island-gradient);
 }
 
 .welcome h2 {
@@ -755,8 +755,8 @@ onMounted(async () => {
 }
 
 .prompt-chip:hover {
-  color: #3b82f6;
-  border-color: #bfdbfe;
+  color: var(--el-color-primary);
+  border-color: var(--el-color-primary-light-8);
   background: #eff6ff;
 }
 
@@ -773,7 +773,7 @@ onMounted(async () => {
 
 .message-avatar {
   flex-shrink: 0;
-  background: linear-gradient(135deg, #3b82f6, #9333ea);
+  background: var(--island-gradient);
   color: #fff;
 }
 
@@ -799,7 +799,7 @@ onMounted(async () => {
 }
 
 .message-row.user .message-bubble {
-  background: #3b82f6;
+  background: var(--el-color-primary);
   color: #fff;
 }
 
@@ -857,7 +857,7 @@ onMounted(async () => {
   height: 14px;
   margin-left: 2px;
   vertical-align: middle;
-  background: #3b82f6;
+  background: var(--el-color-primary);
   animation: blink 1s steps(2) infinite;
 }
 
@@ -942,7 +942,7 @@ onMounted(async () => {
 }
 
 .markdown-body :deep(a) {
-  color: #3b82f6;
+  color: var(--el-color-primary);
   text-decoration: underline;
 }
 
@@ -992,7 +992,7 @@ onMounted(async () => {
 .attachment-kind {
   padding: 0 4px;
   font-size: 11px;
-  color: #3b82f6;
+  color: var(--el-color-primary);
   background: #dbeafe;
   border-radius: 3px;
 }
@@ -1019,7 +1019,7 @@ onMounted(async () => {
 }
 
 .attach-btn:hover {
-  color: #3b82f6;
+  color: var(--el-color-primary);
 }
 
 .composer-input {
@@ -1039,7 +1039,7 @@ onMounted(async () => {
 }
 
 .composer-input:focus {
-  border-color: #3b82f6;
+  border-color: var(--el-color-primary);
   background: #fff;
 }
 
@@ -1060,7 +1060,7 @@ onMounted(async () => {
 }
 
 .drop-hint {
-  color: #3b82f6;
+  color: var(--el-color-primary);
   font-weight: 500;
 }
 

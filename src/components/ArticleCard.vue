@@ -127,20 +127,22 @@ function sanitizeHighlight(html: string): string {
 <style scoped>
 .article-card {
   background: white;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 20px;
   margin-bottom: 16px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--island-card-border);
   transition: all 0.3s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(14, 165, 233, 0.08);
 }
 
+/* hover：像被海浪轻轻托起 —— 上浮 + 海蓝色描边 + 蓝调投影 */
 .article-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border-color: #bfdbfe;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(20, 184, 166, 0.18);
+  border-color: #7dd3c9;
 }
 
 .card-content {
@@ -163,7 +165,7 @@ function sanitizeHighlight(html: string): string {
 }
 
 .title-link:hover .article-title {
-  color: #1890ff;
+  color: var(--el-color-primary);
 }
 
 .article-excerpt {

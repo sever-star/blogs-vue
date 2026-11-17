@@ -25,7 +25,8 @@ const showLoginModal = computed(() => authStore.showLoginModal)
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #f5f5f5;
+  /* 背景交给 body 的海→滩渐变（见 styles/theme.css） */
+  background-color: transparent;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
     'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }

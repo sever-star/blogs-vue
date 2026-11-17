@@ -918,7 +918,7 @@ article {
   margin: 16px 0;
   padding: 12px 16px;
   background-color: #f9fafb;
-  border-left: 4px solid #1890ff;
+  border-left: 4px solid var(--el-color-primary);
   color: #666;
 }
 

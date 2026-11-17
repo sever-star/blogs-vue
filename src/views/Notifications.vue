@@ -261,7 +261,7 @@ onMounted(async () => {
 
 .notif-tab.active {
   background: #ecf5ff;
-  color: #3b82f6;
+  color: var(--el-color-primary);
   font-weight: 500;
 }
 
@@ -281,7 +281,7 @@ onMounted(async () => {
 }
 
 .notif-tab.active .notif-tab-badge {
-  background: #3b82f6;
+  background: var(--el-color-primary);
 }
 
 .mark-all {
@@ -316,7 +316,7 @@ onMounted(async () => {
   height: 7px;
   margin-top: 8px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: var(--el-color-primary);
 }
 
 .notif-dot--read {

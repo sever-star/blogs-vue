@@ -566,7 +566,7 @@ function formatConvTime(time: string | null): string {
 }
 
 .bubble-row.mine .bubble {
-  background: #3b82f6;
+  background: var(--island-gradient);
   color: #fff;
 }
 
